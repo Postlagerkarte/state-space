@@ -1,0 +1,203 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="12.0" DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <Import Project="$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props" Condition="Exists('$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props')" />
+  <PropertyGroup>
+    <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
+    <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
+    <ProjectGuid>{B2BAA3EA-E61C-443A-929B-9BA0726218EB}</ProjectGuid>
+    <OutputType>WinExe</OutputType>
+    <AppDesignerFolder>Properties</AppDesignerFolder>
+    <RootNamespace>Puzzle</RootNamespace>
+    <AssemblyName>Puzzle</AssemblyName>
+    <TargetFrameworkVersion>v4.5</TargetFrameworkVersion>
+    <FileAlignment>512</FileAlignment>
+    <ProjectTypeGuids>{60dc8134-eba5-43b8-bcc9-bb4bc16c2548};{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}</ProjectTypeGuids>
+    <WarningLevel>4</WarningLevel>
+    <SccProjectName>
+    </SccProjectName>
+    <SccLocalPath>
+    </SccLocalPath>
+    <SccAuxPath>
+    </SccAuxPath>
+    <SccProvider>
+    </SccProvider>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
+    <PlatformTarget>AnyCPU</PlatformTarget>
+    <DebugSymbols>true</DebugSymbols>
+    <DebugType>full</DebugType>
+    <Optimize>false</Optimize>
+    <OutputPath>bin\Debug\</OutputPath>
+    <DefineConstants>DEBUG;TRACE</DefineConstants>
+    <ErrorReport>prompt</ErrorReport>
+    <WarningLevel>4</WarningLevel>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
+    <PlatformTarget>AnyCPU</PlatformTarget>
+    <DebugType>pdbonly</DebugType>
+    <Optimize>true</Optimize>
+    <OutputPath>bin\Release\</OutputPath>
+    <DefineConstants>TRACE</DefineConstants>
+    <ErrorReport>prompt</ErrorReport>
+    <WarningLevel>4</WarningLevel>
+  </PropertyGroup>
+  <ItemGroup>
+    <Reference Include="System" />
+    <Reference Include="System.Data" />
+    <Reference Include="System.Drawing" />
+    <Reference Include="System.Reactive.Core">
+      <HintPath>..\packages\Rx-Core.2.2.5\lib\net45\System.Reactive.Core.dll</HintPath>
+    </Reference>
+    <Reference Include="System.Reactive.Interfaces">
+      <HintPath>..\packages\Rx-Interfaces.2.2.5\lib\net45\System.Reactive.Interfaces.dll</HintPath>
+    </Reference>
+    <Reference Include="System.Reactive.Linq">
+      <HintPath>..\packages\Rx-Linq.2.2.5\lib\net45\System.Reactive.Linq.dll</HintPath>
+    </Reference>
+    <Reference Include="System.Reactive.PlatformServices">
+      <HintPath>..\packages\Rx-PlatformServices.2.2.5\lib\net45\System.Reactive.PlatformServices.dll</HintPath>
+    </Reference>
+    <Reference Include="System.Xml" />
+    <Reference Include="Microsoft.CSharp" />
+    <Reference Include="System.Core" />
+    <Reference Include="System.Xml.Linq" />
+    <Reference Include="System.Data.DataSetExtensions" />
+    <Reference Include="System.Xaml">
+      <RequiredTargetFramework>4.0</RequiredTargetFramework>
+    </Reference>
+    <Reference Include="WindowsBase" />
+    <Reference Include="PresentationCore" />
+    <Reference Include="PresentationFramework" />
+  </ItemGroup>
+  <ItemGroup>
+    <ApplicationDefinition Include="App.xaml">
+      <Generator>MSBuild:Compile</Generator>
+      <SubType>Designer</SubType>
+    </ApplicationDefinition>
+    <Compile Include="DragDropExtensions.cs" />
+    <Compile Include="DraggedAdorner.cs" />
+    <Page Include="BoardCell.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="MainWindow.xaml">
+      <Generator>MSBuild:Compile</Generator>
+      <SubType>Designer</SubType>
+    </Page>
+    <Compile Include="App.xaml.cs">
+      <DependentUpon>App.xaml</DependentUpon>
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="BoardCell.xaml.cs">
+      <DependentUpon>BoardCell.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="MainWindow.xaml.cs">
+      <DependentUpon>MainWindow.xaml</DependentUpon>
+      <SubType>Code</SubType>
+    </Compile>
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Include="Properties\AssemblyInfo.cs">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="Properties\Settings.Designer.cs">
+      <AutoGen>True</AutoGen>
+      <DependentUpon>Settings.settings</DependentUpon>
+      <DesignTimeSharedInput>True</DesignTimeSharedInput>
+    </Compile>
+    <None Include="packages.config" />
+    <None Include="Properties\Settings.settings">
+      <Generator>SettingsSingleFileGenerator</Generator>
+      <LastGenOutput>Settings.Designer.cs</LastGenOutput>
+    </None>
+    <AppDesigner Include="Properties\" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="App.config" />
+  </ItemGroup>
+  <ItemGroup>
+    <Resource Include="Images\LightGrass.jpg" />
+  </ItemGroup>
+  <ItemGroup>
+    <Resource Include="Images\Sand.jpg" />
+  </ItemGroup>
+  <ItemGroup>
+    <Resource Include="Images\stone_01bl.png" />
+    <Resource Include="Images\stone_01br.png" />
+    <Resource Include="Images\stone_01tl.png" />
+    <Resource Include="Images\stone_01tr.png" />
+  </ItemGroup>
+  <ItemGroup>
+    <Resource Include="Images\game_object_04bl.png" />
+    <Resource Include="Images\game_object_04br.png" />
+    <Resource Include="Images\game_object_04tl.png" />
+    <Resource Include="Images\game_object_04tr.png" />
+  </ItemGroup>
+  <ItemGroup>
+    <Resource Include="Images\stone_g_03l1.png" />
+    <Resource Include="Images\stone_g_03l2.png" />
+    <Resource Include="Images\stone_g_03l3.png" />
+    <Resource Include="Images\stone_g_03l4.png" />
+  </ItemGroup>
+  <ItemGroup>
+    <Resource Include="Images\wooden_l4_red_1.png" />
+    <Resource Include="Images\wooden_l4_red_2.png" />
+    <Resource Include="Images\wooden_l4_red_3.png" />
+    <Resource Include="Images\wooden_l4_red_4.png" />
+  </ItemGroup>
+  <ItemGroup>
+    <Resource Include="Images\wooden_l4_green_1.png" />
+    <Resource Include="Images\wooden_l4_green_2.png" />
+    <Resource Include="Images\wooden_l4_green_3.png" />
+    <Resource Include="Images\wooden_l4_green_4.png" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Common\Common.csproj">
+      <Project>{4d91c714-067c-4229-b662-d20361655ad5}</Project>
+      <Name>Common</Name>
+    </ProjectReference>
+    <ProjectReference Include="..\LevelGenerator\LevelGenerator\LevelGenerator.csproj">
+      <Project>{ad9a88df-dda2-4fca-842c-122d6e513a6b}</Project>
+      <Name>LevelGenerator</Name>
+    </ProjectReference>
+  </ItemGroup>
+  <ItemGroup>
+    <Resource Include="Images\CrateDark_Beige.png" />
+    <Resource Include="Images\CrateDark_Black.png" />
+    <Resource Include="Images\CrateDark_Blue.png" />
+    <Resource Include="Images\CrateDark_Brown.png" />
+    <Resource Include="Images\CrateDark_Gray.png" />
+    <Resource Include="Images\CrateDark_Purple.png" />
+    <Resource Include="Images\CrateDark_Red.png" />
+    <Resource Include="Images\CrateDark_Yellow.png" />
+    <Resource Include="Images\Crate_Beige.png" />
+    <Resource Include="Images\Crate_Black.png" />
+    <Resource Include="Images\Crate_Blue.png" />
+    <Resource Include="Images\Crate_Brown.png" />
+    <Resource Include="Images\Crate_Gray.png" />
+    <Resource Include="Images\Crate_Purple.png" />
+    <Resource Include="Images\Crate_Red.png" />
+    <Resource Include="Images\Crate_Yellow.png" />
+  </ItemGroup>
+  <ItemGroup>
+    <Resource Include="Images\WallRound_Beige.png" />
+    <Resource Include="Images\WallRound_Black.png" />
+    <Resource Include="Images\WallRound_Brown.png" />
+    <Resource Include="Images\WallRound_Gray.png" />
+    <Resource Include="Images\Wall_Beige.png" />
+    <Resource Include="Images\Wall_Black.png" />
+    <Resource Include="Images\Wall_Brown.png" />
+    <Resource Include="Images\Wall_Gray.png" />
+  </ItemGroup>
+  <ItemGroup>
+    <Resource Include="Images\GroundGravel_Grass.png" />
+  </ItemGroup>
+  <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
+  <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
+       Other similar extension points exist, see Microsoft.Common.targets.
+  <Target Name="BeforeBuild">
+  </Target>
+  <Target Name="AfterBuild">
+  </Target>
+  -->
+</Project>

@@ -1,0 +1,22 @@
+﻿<Window x:Class="Puzzle.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="MainWindow"
+        Width="525"
+        Height="350">
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition></RowDefinition>
+            <RowDefinition></RowDefinition>
+        </Grid.RowDefinitions>
+        <Viewbox Stretch="Uniform">  
+        <Grid x:Name="gameBoard" AllowDrop="True"
+              ShowGridLines="False" >
+            <Grid.Background>
+                <ImageBrush Stretch="Fill" ImageSource="Images/Sand.jpg" AlignmentY="Top" AlignmentX="Center"/>
+            </Grid.Background>
+            </Grid>
+        </Viewbox>  
+        <Button Grid.Row="1" Click="Button_Click">Next</Button>
+    </Grid>
+</Window>
