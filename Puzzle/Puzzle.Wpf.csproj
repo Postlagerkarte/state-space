@@ -122,36 +122,6 @@
     <Resource Include="Images\Sand.jpg" />
   </ItemGroup>
   <ItemGroup>
-    <Resource Include="Images\stone_01bl.png" />
-    <Resource Include="Images\stone_01br.png" />
-    <Resource Include="Images\stone_01tl.png" />
-    <Resource Include="Images\stone_01tr.png" />
-  </ItemGroup>
-  <ItemGroup>
-    <Resource Include="Images\game_object_04bl.png" />
-    <Resource Include="Images\game_object_04br.png" />
-    <Resource Include="Images\game_object_04tl.png" />
-    <Resource Include="Images\game_object_04tr.png" />
-  </ItemGroup>
-  <ItemGroup>
-    <Resource Include="Images\stone_g_03l1.png" />
-    <Resource Include="Images\stone_g_03l2.png" />
-    <Resource Include="Images\stone_g_03l3.png" />
-    <Resource Include="Images\stone_g_03l4.png" />
-  </ItemGroup>
-  <ItemGroup>
-    <Resource Include="Images\wooden_l4_red_1.png" />
-    <Resource Include="Images\wooden_l4_red_2.png" />
-    <Resource Include="Images\wooden_l4_red_3.png" />
-    <Resource Include="Images\wooden_l4_red_4.png" />
-  </ItemGroup>
-  <ItemGroup>
-    <Resource Include="Images\wooden_l4_green_1.png" />
-    <Resource Include="Images\wooden_l4_green_2.png" />
-    <Resource Include="Images\wooden_l4_green_3.png" />
-    <Resource Include="Images\wooden_l4_green_4.png" />
-  </ItemGroup>
-  <ItemGroup>
     <ProjectReference Include="..\Common\Common.csproj">
       <Project>{4d91c714-067c-4229-b662-d20361655ad5}</Project>
       <Name>Common</Name>

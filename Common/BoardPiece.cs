@@ -32,10 +32,9 @@ namespace Common
         }
 
         public string Texture { get; set; }
-
-        public BoardPiece(int[] offsets, string texture)
+   
+        public BoardPiece(int[] offsets)
         {
-            this.Texture = texture;
             this.offsets = offsets;
         }
 
@@ -51,7 +50,8 @@ namespace Common
             this.offsets = offsets;
             this.locations = new int[offsets.Length];
 
-            for (int x = 0; x < offsets.Length; x++)
+            int len = offsets.Length;
+            for (int x = 0; x < len; x++)
             {
                 this.locations[x] = index + offsets[x];
             }

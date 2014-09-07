@@ -19,47 +19,47 @@ namespace LevelGenerator
         //S: two stacked horizontal dominoes with the top one offset to the right.
         //Z: two stacked horizontal dominoes with the top one offset to the left
 
-        private static Dictionary<string, Func<BoardPiece>> KnownPieces = new Dictionary<string, Func<BoardPiece>>()
+        public static Dictionary<string, Func<BoardPiece>> KnownPieces = new Dictionary<string, Func<BoardPiece>>()
         {
-            {"i", ()=>new BoardPiece(new []{0,1,2,3}, "Crate_Beige")},
-            {"o", ()=>new BoardPiece(new []{0,1,8,9}, "Crate_Black")},
-            {"t", ()=>new BoardPiece(new []{0,1,2,9}, "Crate_Blue")},
-            {"j", ()=>new BoardPiece(new []{0,1,2,10}, "Crate_Brown")},
-            {"l", ()=>new BoardPiece(new []{0,1,2,8}, "Crate_Gray")},
-            {"s", ()=>new BoardPiece(new []{1,2,8,9}, "Crate_Purple")},
-            {"z", ()=>new BoardPiece(new []{0,1,9,10}, "Crate_Red")},
+            {"i", ()=>new BoardPiece(
+                new []{8,9,10})},
+
+            {"o", ()=>new BoardPiece(new []{0,1,8,9})},
+            {"t1", ()=>new BoardPiece(new []{0,1,2,9})},
+            {"t2", ()=>new BoardPiece(new []{1,8,9,10})},
+            {"t3", ()=>new BoardPiece(new []{1,9,10,17})},
+            {"t4", ()=>new BoardPiece(new []{1,8,9,17})},
+            {"j1", ()=>new BoardPiece(new []{0,1,2,10})},
+            {"j2", ()=>new BoardPiece(new []{2,10,17,18})},
+            {"j3", ()=>new BoardPiece(new []{0,8,9,10})},
+            {"j4", ()=>new BoardPiece(new []{0,1,8,16})},
+            {"l1", ()=>new BoardPiece(new []{0,1,2,8})},
+            {"l2", ()=>new BoardPiece(new []{1,2,10,18})},
+            {"l3", ()=>new BoardPiece(new []{2,8,9,10})},
+            {"l4", ()=>new BoardPiece(new []{0,8,16,17})},
+            {"s1", ()=>new BoardPiece(new []{1,2,8,9})},
+            {"s2", ()=>new BoardPiece(new []{0,8,9,17})},
+            {"z1", ()=>new BoardPiece(new []{0,1,9,10})},
+            {"z2", ()=>new BoardPiece(new []{1,8,9,16})},
         };
         
         private static int[] deltas = new[] { -1, 1, 8, -8 };
 
-        private string[] layout; 
-
+        private string[] layout;
 
         private int[] locations;
 
-        private List<BoardPiece> pieces = new List<BoardPiece>();
-
-        public BoardViewModel CreateViewModel()
-        {
-            this.pieces.ForEach(p => p.Texture = @"\Images\" + p.Texture + ".png");
-            return new BoardViewModel(this.pieces[0], this.pieces.Skip(1).ToList());
-        }
-
+        public BoardPiece[] Pieces = new BoardPiece[7];
 
         public bool SetUpBoard(int[] locations)
         {
-            this.pieces.Clear();
-            
+       
             this.locations = locations;
-
-            var board = new BoardPiece(0, new[] { 0, 1, 2, 3, 4, 5, 6, 7, 8, 15, 16, 23, 24, 31, 32, 39, 40, 47, 48, 55, 56, 57, 58, 59, 60, 61, 62, 63 }, "Wall_Brown");
-            this.pieces.Add(board);
-
-            for (int i = 0; i < layout.Count(); i++)
+            int len = Pieces.Length - 2;
+            //move the pieces (excpet player and board) to their desired indexes
+            for (int i = 0; i < len; i++)
             {
-                var piece = KnownPieces[layout[i]]();
-                piece.MoveToIndex(locations[i]);
-                this.pieces.Add(piece);
+                this.Pieces[i + 2].MoveToIndex(locations[i]);
             }
 
             return this.IsValid;
@@ -72,6 +72,22 @@ namespace LevelGenerator
         public Board(string[] layout)
         {
             this.layout = layout;
+            //create the board, must be the first element in the pieces collection(!)
+            var board = new BoardPiece(0, new[] { 0, 1, 2, 3, 4, 5, 6, 7, 8, 15, 16, 23, 24, 31, 32, 39, 40, 47, 48, 55, 56, 57, 58, 59, 60, 61, 62, 63 }, "Wall_Brown");
+            this.Pieces[0] = board;
+
+            //create the player piece
+            var player = KnownPieces["o"](); //create our player 
+            player.MoveToIndex(9); 
+            this.Pieces[1] = player;
+
+            //create the other pieces
+            int len = Pieces.Length - 2;
+            //create the other pieces from the layout
+            for (int i = 0; i < len; i++)
+            {
+               this.Pieces[i + 2] = KnownPieces[layout[i]]();
+            }
         }
 
         // Create a board from its parent
@@ -85,7 +101,7 @@ namespace LevelGenerator
         public IEnumerable<Board> GetMoves()
         {
             //Try to move each piece (except for the board)...
-            for(int i=1; i<this.pieces.Count; i++)
+            for(int i=1; i < Pieces.Length; i++)
             {
                  // ... in each direction...
                 foreach (var delta in deltas)
@@ -127,23 +143,28 @@ namespace LevelGenerator
         {
             get
             {
-                // Array to track occupied cells
                 var occupiedCells = new bool[Helper.BoardWidth * Helper.BoardHeight];
-                // For each piece (including the board)...
-                foreach(var piece in this.pieces)
-                {
-                    foreach(var offset in piece.Offsets)
+
+                int len = Pieces.Length;
+                // For each piece ...
+                    for (int i = 0; i < len; i++)
                     {
-                        var location = piece.Index + offset;
-                        if (occupiedCells[location])
+                        var index = this.Pieces[i].Index;
+                        var offsets = this.Pieces[i].Offsets;
+                        //foreach offset inside the piece
+                        var max = this.Pieces[i].Offsets.Length;
+                        for (int x = 0;x < max; x++)
                         {
-                            // Already occupied; invalid board
-                            return false;
+                            var location = index + offsets[x];
+                            if (occupiedCells[location])
+                            {
+                                // Already occupied; invalid board
+                                return false;
+                            }
+                            // ... and mark it occupied
+                            occupiedCells[location] = true;
                         }
-                        // ... and mark it occupied
-                        occupiedCells[location] = true;
                     }
-                }
 
                 return true;
             }
@@ -199,9 +220,10 @@ namespace LevelGenerator
         {
             var hash = 0;
             var shift = 0;
-            foreach (var i in b.locations)
+            int len = b.locations.Length;
+            for(int x=0; x<len;x++)
             {
-                hash ^= (i << shift);
+                hash ^= (b.locations[x] << shift);
                 shift += 4;
             }
             return hash;

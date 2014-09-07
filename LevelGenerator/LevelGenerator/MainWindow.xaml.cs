@@ -27,8 +27,6 @@ namespace LevelGenerator
 
         private void Button_Click(object sender, RoutedEventArgs e)
         {
-            LevelGeneratorService service = new LevelGeneratorService();
-            var board = service.CreateValidBoard();
         }
     }
 }
