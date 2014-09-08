@@ -40,7 +40,15 @@ namespace Puzzle
             myCanvas.SetBinding(Button.TagProperty,
                 new Binding { Path = new PropertyPath(String.Format("[{0},{1}]", row, column)) });
             //myCanvas.SetBinding(Button.CommandProperty, new Binding { Path = new PropertyPath("HandleClickCommand") });
-            //myCanvas.CommandParameter = new Tuple<int,int>(row, column);
+            myCanvas.CommandParameter = new Tuple<int, int>(row, column);
+
+            var mouseBinding = new MouseBinding();
+            mouseBinding.Gesture = new MouseGesture(MouseAction.LeftDoubleClick);
+            mouseBinding.Command = this.ViewModel.HandleClickCommand;
+            mouseBinding.CommandParameter = new Tuple<int, int>(row, column);
+            myCanvas.InputBindings.Add(mouseBinding);
+
+
             this.Tag = new Tuple<int, int>(row, column);
             ButtonBehavior.SetIndex(myCanvas, Helper.GetIndex(row, column));
             //dbg.Text = Helper.GetIndex(row, column).ToString();

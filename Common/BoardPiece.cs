@@ -31,11 +31,14 @@ namespace Common
             }
         }
 
+        private int[][] rotations;
+
         public string Texture { get; set; }
    
-        public BoardPiece(int[] offsets)
+        public BoardPiece(int[] offsets, int[][] rotations)
         {
             this.offsets = offsets;
+            this.rotations = rotations;
         }
 
         public BoardPiece(int index, int[] offsets, string texture)
@@ -65,6 +68,16 @@ namespace Common
         public void MoveToIndex(int index)
         {
             this.BuildUp(index, this.offsets);
+        }
+
+        int currentRotation = -1;
+
+        public void Rotate()
+        {
+            currentRotation++;
+            this.offsets = this.rotations[currentRotation];
+            if (currentRotation == 3) currentRotation = -1;
+            this.MoveToIndex(this.Index);
         }
 
     }

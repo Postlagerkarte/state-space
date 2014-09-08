@@ -46,6 +46,22 @@ namespace Common
             //this.boardLayout = layout;
         }
 
+        public DelegateCommand<Tuple<int,int>> HandleClickCommand
+        {
+            get { return new DelegateCommand<Tuple<int,int>>(HandleClick);}
+        }
+
+        private void HandleClick(Tuple<int,int> obj)
+        {
+            var index = Helper.GetIndex(obj.Item1, obj.Item2);
+
+            var piece = this.pieces.SingleOrDefault(p => p.IsInLocation(index));
+
+            piece.Rotate();
+
+            this.OnPropertyChanged("Item[]");
+        }
+
 
         public bool CanMoveToIndex(int index)
         {

@@ -22,25 +22,32 @@ namespace LevelGenerator
         public static Dictionary<string, Func<BoardPiece>> KnownPieces = new Dictionary<string, Func<BoardPiece>>()
         {
             {"i", ()=>new BoardPiece(
-                new []{8,9,10})},
+                new []{8,9,10},
+                new int[4][] 
+                { 
+                    new[] { 0,   1,   2 },
+                    new[] { 0,   8,  16},
+                    new[] { 16, 17,  18},
+                    new[] { 2,  10,  18} 
+                })},
 
-            {"o", ()=>new BoardPiece(new []{0,1,8,9})},
-            {"t1", ()=>new BoardPiece(new []{0,1,2,9})},
-            {"t2", ()=>new BoardPiece(new []{1,8,9,10})},
-            {"t3", ()=>new BoardPiece(new []{1,9,10,17})},
-            {"t4", ()=>new BoardPiece(new []{1,8,9,17})},
-            {"j1", ()=>new BoardPiece(new []{0,1,2,10})},
-            {"j2", ()=>new BoardPiece(new []{2,10,17,18})},
-            {"j3", ()=>new BoardPiece(new []{0,8,9,10})},
-            {"j4", ()=>new BoardPiece(new []{0,1,8,16})},
-            {"l1", ()=>new BoardPiece(new []{0,1,2,8})},
-            {"l2", ()=>new BoardPiece(new []{1,2,10,18})},
-            {"l3", ()=>new BoardPiece(new []{2,8,9,10})},
-            {"l4", ()=>new BoardPiece(new []{0,8,16,17})},
-            {"s1", ()=>new BoardPiece(new []{1,2,8,9})},
-            {"s2", ()=>new BoardPiece(new []{0,8,9,17})},
-            {"z1", ()=>new BoardPiece(new []{0,1,9,10})},
-            {"z2", ()=>new BoardPiece(new []{1,8,9,16})},
+            {"o", ()=>new BoardPiece(new []{0,1,8,9}, null)},
+            //{"t1", ()=>new BoardPiece(new []{0,1,2,9})},
+            //{"t2", ()=>new BoardPiece(new []{1,8,9,10})},
+            //{"t3", ()=>new BoardPiece(new []{1,9,10,17})},
+            //{"t4", ()=>new BoardPiece(new []{1,8,9,17})},
+            //{"j1", ()=>new BoardPiece(new []{0,1,2,10})},
+            //{"j2", ()=>new BoardPiece(new []{2,10,17,18})},
+            //{"j3", ()=>new BoardPiece(new []{0,8,9,10})},
+            //{"j4", ()=>new BoardPiece(new []{0,1,8,16})},
+            //{"l1", ()=>new BoardPiece(new []{0,1,2,8})},
+            //{"l2", ()=>new BoardPiece(new []{1,2,10,18})},
+            //{"l3", ()=>new BoardPiece(new []{2,8,9,10})},
+            //{"l4", ()=>new BoardPiece(new []{0,8,16,17})},
+            //{"s1", ()=>new BoardPiece(new []{1,2,8,9})},
+            //{"s2", ()=>new BoardPiece(new []{0,8,9,17})},
+            //{"z1", ()=>new BoardPiece(new []{0,1,9,10})},
+            //{"z2", ()=>new BoardPiece(new []{1,8,9,16})},
         };
         
         private static int[] deltas = new[] { -1, 1, 8, -8 };
@@ -49,7 +56,7 @@ namespace LevelGenerator
 
         private int[] locations;
 
-        public BoardPiece[] Pieces = new BoardPiece[7];
+        public BoardPiece[] Pieces;
 
         public bool SetUpBoard(int[] locations)
         {
@@ -71,6 +78,7 @@ namespace LevelGenerator
   
         public Board(string[] layout)
         {
+            this.Pieces = new BoardPiece[layout.Length + 2];
             this.layout = layout;
             //create the board, must be the first element in the pieces collection(!)
             var board = new BoardPiece(0, new[] { 0, 1, 2, 3, 4, 5, 6, 7, 8, 15, 16, 23, 24, 31, 32, 39, 40, 47, 48, 55, 56, 57, 58, 59, 60, 61, 62, 63 }, "Wall_Brown");
