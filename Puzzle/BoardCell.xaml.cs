@@ -54,43 +54,43 @@ namespace Puzzle
             //dbg.Text = Helper.GetIndex(row, column).ToString();
 
 
-            myCanvas.ObserveBeginMouseDrag().Subscribe(e =>
-                {
-                    var index = Helper.GetIndex(row, column);
-                    if (!this.ViewModel.CanPieceMove(index)) return;
-                    this.ViewModel.CalculatePossibleMoves(index);
+            //myCanvas.ObserveBeginMouseDrag().Subscribe(e =>
+            //    {
+            //        var index = Helper.GetIndex(row, column);
+            //        if (!this.ViewModel.CanPieceMove(index)) return;
+            //        this.ViewModel.CalculatePossibleMoves(index);
 
-                    var dragData = new DataObject("oldIndex", index);
-                    DragDrop.DoDragDrop(myCanvas, dragData, DragDropEffects.Move);
-                });
+            //        var dragData = new DataObject("oldIndex", index);
+            //        DragDrop.DoDragDrop(myCanvas, dragData, DragDropEffects.Move);
+            //    });
 
-            myCanvas.ObservePreviewDragOver().Subscribe(ev =>
-             {
-                 var newIndex = ButtonBehavior.GetIndex((Button)ev.Sender);
+            //myCanvas.ObservePreviewDragOver().Subscribe(ev =>
+            // {
+            //     var newIndex = ButtonBehavior.GetIndex((Button)ev.Sender);
 
-                 if(!this.ViewModel.CanMoveToIndex(newIndex))
-                 {
-                     ev.EventArgs.Handled = true;
-                     return;
-                 }
+            //     if(!this.ViewModel.CanMoveToIndex(newIndex))
+            //     {
+            //         ev.EventArgs.Handled = true;
+            //         return;
+            //     }
 
-                 var oldIndex = (int)ev.EventArgs.Data.GetData("oldIndex");
+            //     var oldIndex = (int)ev.EventArgs.Data.GetData("oldIndex");
 
-                 this.ViewModel.PreviewDrop(oldIndex, newIndex);
+            //     this.ViewModel.PreviewDrop(oldIndex, newIndex);
 
-                 ev.EventArgs.Data.SetData("oldIndex", newIndex);
+            //     ev.EventArgs.Data.SetData("oldIndex", newIndex);
 
-                 var canDrop = ev.EventArgs.Data.GetDataPresent("myDragData");
-                 ev.EventArgs.Effects = canDrop ? DragDropEffects.Move : DragDropEffects.None;
-                 ev.EventArgs.Handled = canDrop;
+            //     var canDrop = ev.EventArgs.Data.GetDataPresent("myDragData");
+            //     ev.EventArgs.Effects = canDrop ? DragDropEffects.Move : DragDropEffects.None;
+            //     ev.EventArgs.Handled = canDrop;
                  
 
-             });
+            // });
 
-            myCanvas.ObservePreviewDrop().Subscribe(e => 
-            {
-                this.ViewModel.Drop();
-            });
+            //myCanvas.ObservePreviewDrop().Subscribe(e => 
+            //{
+            //    this.ViewModel.Drop();
+            //});
 
            
         }

@@ -20,30 +20,6 @@ namespace Common
         {
             this.pieces = pieces;
             this.boardLayout = boardLayout;
-
-            //  9,60,11,41,49,27,33,0
-
-            //pieces.Add(new BoardPiece(9, new[] { 0, 1, 8, 9 }, "game_object_04tl.png", "game_object_04tr.png", "game_object_04bl.png", "game_object_04br.png"));
-
-            //pieces.Add(new BoardPiece(60, new[] { 0, 1, 8, 9 }, "stone_01tl.png", "stone_01tr.png", "stone_01bl.png", "stone_01br.png"));
-            //pieces.Add(new BoardPiece(11, new[] { 0, 1, 8, 9 }, "stone_01tl.png", "stone_01tr.png", "stone_01bl.png", "stone_01br.png"));
-
-            //pieces.Add(new BoardPiece(26, new[] { 0, 1, 8, 9 }, ".jpg", "Sand"));
-
-            //pieces.Add(new BoardPiece(41, new[] { 0, 1, 2, 3 }, "wooden_l4_red_1.png", "wooden_l4_red_2.png", "wooden_l4_red_3.png", "wooden_l4_red_4.png"));
-            //pieces.Add(new BoardPiece(49, new[] { 0, 1, 2, 3 }, "wooden_l4_green_1.png", "wooden_l4_green_2.png", "wooden_l4_green_3.png", "wooden_l4_green_4.png"));
-            //pieces.Add(new BoardPiece(27, new[] { 0, 1, 2, 3 }, "wooden_l4_green_1.png", "wooden_l4_green_2.png", "wooden_l4_green_3.png", "wooden_l4_green_4.png"));
-            //pieces.Add(new BoardPiece(33, new[] { 0, 1, 2, 3 }, "wooden_l4_green_1.png", "wooden_l4_green_2.png", "wooden_l4_green_3.png", "wooden_l4_green_4.png"));
-
-            //pieces.Add(new BoardPiece(25, new[] { 0, 8, 16, 24 }, ".jpg", "Sand"));
-            //pieces.Add(new BoardPiece(30, new[] { 0, 8, 16, 24 }, ".jpg", "Sand"));
-
-            //var layout =
-            //    new BoardPiece(0,
-            //        new[] { 0, 1, 2, 3, 4, 5, 6, 7, 8, 15, 16, 23, 24, 31, 32, 39, 40, 47, 48, 55, 56, 63, 64, 71, 72, 73, 74, 75, 76, 77, 78, 79 },
-            //        "LightGrass.jpg");
-  
-            //this.boardLayout = layout;
         }
 
         public DelegateCommand<Tuple<int,int>> HandleClickCommand
@@ -53,6 +29,7 @@ namespace Common
 
         private void HandleClick(Tuple<int,int> obj)
         {
+            return;
             var index = Helper.GetIndex(obj.Item1, obj.Item2);
 
             var piece = this.pieces.SingleOrDefault(p => p.IsInLocation(index));
@@ -62,6 +39,12 @@ namespace Common
             this.OnPropertyChanged("Item[]");
         }
 
+
+        public void MoveToIndex(int newIndex, int oldIndex)
+        {
+            this.pieces.Single(p => p.IsInLocation(oldIndex)).MoveToIndex(newIndex);
+            this.OnPropertyChanged("Item[]");
+        }
 
         public bool CanMoveToIndex(int index)
         {
@@ -74,18 +57,15 @@ namespace Common
             return true;
         }
 
-
-        public void CalculatePossibleMoves(int index)
+        public void CalculatePossibleMoves(BoardPiece selectedPiece)
         {
-            var selectedPiece = this.pieces.SingleOrDefault(p => p.IsInLocation(index));
+            this.simulatedPieces.Clear();
 
-            if (selectedPiece == null) return; //no moveable piece was selected
-
-            var simPieceTexture = @"Images\GroundGravel_Grass.png";
+            var simPieceTexture = @"Images\Wall_Beige.png";
 
             var simulatedPiece = new BoardPiece(selectedPiece.Index, selectedPiece.Offsets, simPieceTexture);
             this.simulatedPieces.Add(simulatedPiece);
- 
+
             foreach (var delta in this.deltas)
             {
                 bool valid = true;
@@ -102,6 +82,15 @@ namespace Common
                     }
                 }
             }
+        }
+
+        public void CalculatePossibleMoves(int currentIndex)
+        {
+            var selectedPiece = this.pieces.SingleOrDefault(p => p.IsInLocation(currentIndex));
+
+            if (selectedPiece == null) throw new InvalidOperationException("No moveable piece selected");
+
+            this.CalculatePossibleMoves(selectedPiece);
         }
 
         private bool IsValidPiece(BoardPiece newPiece, BoardPiece selectedPiece)
@@ -154,14 +143,17 @@ namespace Common
             return this.pieces.Any(p => p.IsInLocation(index));
         }
 
-        public void PreviewDrop(int oldIndex, int newIndex)
+        public void PreviewDrop(int currentIndex, int newIndex)
         {
-            var piece = this.pieces.SingleOrDefault(p => p.IsInLocation(oldIndex));
-            var index = this.simulatedPieces.First(p => p.IsInLocation(newIndex)).Index;
-            piece.MoveToIndex(index);
-            this.simulatedPieces.Clear();
-            this.CalculatePossibleMoves(index);
-            this.OnPropertyChanged("Item[]");
+
+                var piece = this.pieces.SingleOrDefault(p => p.IsInLocation(currentIndex));
+                var index = this.simulatedPieces.First(p => p.IsInLocation(newIndex)).Index;
+                piece.MoveToIndex(index);
+
+                this.CalculatePossibleMoves(piece);
+
+                this.OnPropertyChanged("Item[]");
+            
         }
 
         public void Drop()

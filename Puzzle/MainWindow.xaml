@@ -10,7 +10,7 @@
             <RowDefinition></RowDefinition>
         </Grid.RowDefinitions>
         <Viewbox Stretch="Uniform">  
-        <Grid x:Name="gameBoard" AllowDrop="True"
+        <Grid x:Name="gameBoard" AllowDrop="False"
               ShowGridLines="False" >
             <Grid.Background>
                 <ImageBrush Stretch="Fill" ImageSource="Images/Sand.jpg" AlignmentY="Top" AlignmentX="Center"/>
