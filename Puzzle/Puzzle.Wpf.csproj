@@ -74,7 +74,6 @@
       <Generator>MSBuild:Compile</Generator>
       <SubType>Designer</SubType>
     </ApplicationDefinition>
-    <Compile Include="DragDropExtensions.cs" />
     <Compile Include="DraggedAdorner.cs" />
     <Page Include="BoardCell.xaml">
       <SubType>Designer</SubType>

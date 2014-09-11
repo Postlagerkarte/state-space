@@ -15,19 +15,18 @@ namespace Common
         private List<BoardPiece> simulatedPieces = new List<BoardPiece>();
         private BoardPiece boardLayout;
 
-
         public BoardViewModel(BoardPiece boardLayout, List<BoardPiece> pieces)
         {
             this.pieces = pieces;
             this.boardLayout = boardLayout;
         }
 
-        public DelegateCommand<Tuple<int,int>> HandleClickCommand
+        public DelegateCommand<Tuple<int,int>> RotateCommand
         {
-            get { return new DelegateCommand<Tuple<int,int>>(HandleClick);}
+            get { return new DelegateCommand<Tuple<int,int>>(Rotate);}
         }
 
-        private void HandleClick(Tuple<int,int> obj)
+        private void Rotate(Tuple<int,int> obj)
         {
             return;
             var index = Helper.GetIndex(obj.Item1, obj.Item2);
@@ -145,15 +144,13 @@ namespace Common
 
         public void PreviewDrop(int currentIndex, int newIndex)
         {
-
                 var piece = this.pieces.SingleOrDefault(p => p.IsInLocation(currentIndex));
                 var index = this.simulatedPieces.First(p => p.IsInLocation(newIndex)).Index;
                 piece.MoveToIndex(index);
 
                 this.CalculatePossibleMoves(piece);
 
-                this.OnPropertyChanged("Item[]");
-            
+                this.OnPropertyChanged("Item[]");          
         }
 
         public void Drop()

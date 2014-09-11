@@ -44,54 +44,14 @@ namespace Puzzle
 
             var mouseBinding = new MouseBinding();
             mouseBinding.Gesture = new MouseGesture(MouseAction.LeftDoubleClick);
-            mouseBinding.Command = this.ViewModel.HandleClickCommand;
+            mouseBinding.Command = this.ViewModel.RotateCommand;
             mouseBinding.CommandParameter = new Tuple<int, int>(row, column);
             myCanvas.InputBindings.Add(mouseBinding);
 
 
             this.Tag = new Tuple<int, int>(row, column);
-            ButtonBehavior.SetIndex(myCanvas, Helper.GetIndex(row, column));
+
             //dbg.Text = Helper.GetIndex(row, column).ToString();
-
-
-            //myCanvas.ObserveBeginMouseDrag().Subscribe(e =>
-            //    {
-            //        var index = Helper.GetIndex(row, column);
-            //        if (!this.ViewModel.CanPieceMove(index)) return;
-            //        this.ViewModel.CalculatePossibleMoves(index);
-
-            //        var dragData = new DataObject("oldIndex", index);
-            //        DragDrop.DoDragDrop(myCanvas, dragData, DragDropEffects.Move);
-            //    });
-
-            //myCanvas.ObservePreviewDragOver().Subscribe(ev =>
-            // {
-            //     var newIndex = ButtonBehavior.GetIndex((Button)ev.Sender);
-
-            //     if(!this.ViewModel.CanMoveToIndex(newIndex))
-            //     {
-            //         ev.EventArgs.Handled = true;
-            //         return;
-            //     }
-
-            //     var oldIndex = (int)ev.EventArgs.Data.GetData("oldIndex");
-
-            //     this.ViewModel.PreviewDrop(oldIndex, newIndex);
-
-            //     ev.EventArgs.Data.SetData("oldIndex", newIndex);
-
-            //     var canDrop = ev.EventArgs.Data.GetDataPresent("myDragData");
-            //     ev.EventArgs.Effects = canDrop ? DragDropEffects.Move : DragDropEffects.None;
-            //     ev.EventArgs.Handled = canDrop;
-                 
-
-            // });
-
-            //myCanvas.ObservePreviewDrop().Subscribe(e => 
-            //{
-            //    this.ViewModel.Drop();
-            //});
-
            
         }
 

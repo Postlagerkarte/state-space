@@ -51,78 +51,29 @@ namespace Puzzle
             this.gameBoard.ColumnDefinitions.Clear();
         }
 
+        private int currentIndex = -1; //index of the currently selected piece
+        
         void gameBoard_PreviewMouseLeftButtonUp(object sender, MouseButtonEventArgs e)
         {
-            this.currentIndex = -1;  //no piece is selected
+            this.boardViewModel.Drop();
+            this.currentIndex = -1;  //user dropped his piece, no piece is selected now!
         }
-
-        private int currentIndex = -1;
-
-        private int newIndex;
-
-        //void gameBoard_MouseMove(object sender, MouseEventArgs e)
-        //{
-        //    if (this.SelectedPieceIndex == -1) return;
-        //    this.gameBoard.MouseMove -= gameBoard_MouseMove;
-
-        //    var position = e.GetPosition(gameBoard);
-        //    var rowcol = GetRowCol(position);
-        //    newIndex = Helper.GetIndex(rowcol.Item1, rowcol.Item2);
-
-        //    if(newIndex != this.SelectedPieceIndex)
-        //    {         
-        //        this.boardViewModel.PreviewDrop(this.SelectedPieceIndex, newIndex);
-        //    }
-        //    this.gameBoard.MouseMove += gameBoard_MouseMove;
-        //}
 
         void gameBoard_PreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
         {
-            e.Handled = true;
+            e.Handled = true; // otherwise we have no mouse-enter events!
 
             var element = e.Source as UIElement;
             var x = Grid.GetColumn(element);
             var y = Grid.GetRow(element);
-            int index = Helper.GetIndex(y, x);
+            int currentIndex = Helper.GetIndex(y, x);
 
-            if (this.boardViewModel.CanPieceMove(index))
+            if (this.boardViewModel.CanPieceMove(currentIndex))
             {
-                this.boardViewModel.CalculatePossibleMoves(index);
-                this.currentIndex = index;
+                this.boardViewModel.CalculatePossibleMoves(currentIndex);
+                this.currentIndex = currentIndex; //store current index
             }
         }
-
-        //public Tuple<int,int> GetRowCol(Point position)
-        //{
-        //    double start = 0.0;
-        //    int row = 0;
-        //    foreach (RowDefinition rd in this.gameBoard.RowDefinitions)
-        //    {
-        //        start += rd.ActualHeight;
-        //        if (position.Y < start)
-        //        {
-        //            break;
-        //        }
-        //        row++;
-        //    }
-
-        //    double start2 = 0.0;
-        //    int col = 0;
-        //    foreach (var rd in this.gameBoard.ColumnDefinitions)
-        //    {
-        //        start2 += rd.ActualWidth;
-        //        if (position.X < start2)
-        //        {
-        //            break;
-        //        }
-        //        col++;
-        //    }
-
-        //    return new Tuple<int, int>(row, col);
-        //}
-
-
-
 
         private void CreateBoard(BoardViewModel boardViewModel)
         {
@@ -138,17 +89,11 @@ namespace Puzzle
                 {
                     var boardCell = new BoardCell(boardViewModel, row, column);
                     boardCell.MouseEnter += boardCell_MouseEnter;
-                    boardCell.MouseLeave += boardCell_MouseLeave;
                     Grid.SetRow(boardCell, row);
                     Grid.SetColumn(boardCell, column);
                     gameBoard.Children.Add(boardCell);
                 }
             }
-        }
-
-        void boardCell_MouseLeave(object sender, MouseEventArgs e)
-        {
-            
         }
 
         void boardCell_MouseEnter(object sender, MouseEventArgs e)
@@ -163,8 +108,6 @@ namespace Puzzle
             if(this.boardViewModel.CanMoveToIndex(newIndex))
             {
                 this.boardViewModel.PreviewDrop(this.currentIndex, newIndex);
-                //this.boardViewModel.MoveToIndex(newIndex, currentIndex);
-                //this.boardViewModel.CalculatePossibleMoves(newIndex);
                 this.currentIndex = newIndex;
             }
         }

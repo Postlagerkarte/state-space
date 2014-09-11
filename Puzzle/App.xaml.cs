@@ -22,25 +22,4 @@ namespace Puzzle
     public partial class App : Application
     {
     }
-
-
-
-    public class ButtonBehavior
-    {
-        public static readonly DependencyProperty IndexProperty =
-               DependencyProperty.RegisterAttached("Index",
-                                                   typeof(int),
-                                                   typeof(ButtonBehavior),
-                                                   new FrameworkPropertyMetadata(null));
-
-        public static int GetIndex(DependencyObject d)
-        {
-            return (int)d.GetValue(IndexProperty);
-        }
-
-        public static void SetIndex(DependencyObject d, int value)
-        {
-            d.SetValue(IndexProperty, value);
-        }
-    }
 }
