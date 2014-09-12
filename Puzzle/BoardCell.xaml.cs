@@ -37,19 +37,22 @@ namespace Puzzle
 
             this.DataContext = dataContext;
 
+            // this calls into the data context indexer (which is boardviewmodel)
+            // and returns the appropriate image for the cell
             myCanvas.SetBinding(Button.TagProperty,
                 new Binding { Path = new PropertyPath(String.Format("[{0},{1}]", row, column)) });
+
             //myCanvas.SetBinding(Button.CommandProperty, new Binding { Path = new PropertyPath("HandleClickCommand") });
-            myCanvas.CommandParameter = new Tuple<int, int>(row, column);
+            //myCanvas.CommandParameter = new Tuple<int, int>(row, column);
 
-            var mouseBinding = new MouseBinding();
-            mouseBinding.Gesture = new MouseGesture(MouseAction.LeftDoubleClick);
-            mouseBinding.Command = this.ViewModel.RotateCommand;
-            mouseBinding.CommandParameter = new Tuple<int, int>(row, column);
-            myCanvas.InputBindings.Add(mouseBinding);
+            //var mouseBinding = new MouseBinding();
+            //mouseBinding.Gesture = new MouseGesture(MouseAction.LeftDoubleClick);
+            //mouseBinding.Command = this.ViewModel.RotateCommand;
+            //mouseBinding.CommandParameter = new Tuple<int, int>(row, column);
+            //myCanvas.InputBindings.Add(mouseBinding);
 
 
-            this.Tag = new Tuple<int, int>(row, column);
+            //this.Tag = new Tuple<int, int>(row, column);
 
             //dbg.Text = Helper.GetIndex(row, column).ToString();
            

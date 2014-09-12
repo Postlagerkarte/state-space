@@ -13,6 +13,7 @@ namespace Common
         private int[] deltas = new int[] { -1, 1, -Helper.BoardWidth, Helper.BoardWidth };
         private List<BoardPiece> pieces = new List<BoardPiece>();
         private List<BoardPiece> simulatedPieces = new List<BoardPiece>();
+        private BoardPiece simulatedRotation;
         private BoardPiece boardLayout;
 
         public BoardViewModel(BoardPiece boardLayout, List<BoardPiece> pieces)
@@ -21,37 +22,20 @@ namespace Common
             this.boardLayout = boardLayout;
         }
 
-        public DelegateCommand<Tuple<int,int>> RotateCommand
-        {
-            get { return new DelegateCommand<Tuple<int,int>>(Rotate);}
-        }
-
-        private void Rotate(Tuple<int,int> obj)
-        {
-            return;
-            var index = Helper.GetIndex(obj.Item1, obj.Item2);
-
-            var piece = this.pieces.SingleOrDefault(p => p.IsInLocation(index));
-
-            piece.Rotate();
-
-            this.OnPropertyChanged("Item[]");
-        }
-
-
         public void MoveToIndex(int newIndex, int oldIndex)
         {
             this.pieces.Single(p => p.IsInLocation(oldIndex)).MoveToIndex(newIndex);
             this.OnPropertyChanged("Item[]");
         }
 
-        public bool CanMoveToIndex(int index)
+
+        public bool CanMoveToPosition(int position)
         {
             //no if index is occupied by another piece 
-            if (this.pieces.Any(p => p.IsInLocation(index))) return false;
+            if (this.pieces.Any(p => p.IsInLocation(position))) return false;
 
             //no if the index is not covered by a simulated move
-            if (this.simulatedPieces.None(p => p.IsInLocation(index))) return false;
+            if (this.simulatedPieces.None(p => p.IsInLocation(position))) return false;
 
             return true;
         }
@@ -116,8 +100,14 @@ namespace Common
             {
                 var index = Helper.GetIndex(row, column);
 
+                //Asking for board image?
                 if (boardLayout.IsInLocation(index)) return boardLayout.Texture;
 
+                //Asking for rotation simulation image?
+                if (simulatedRotation != null && simulatedRotation.IsInLocation(index))
+                    return simulatedRotation.Texture;
+
+                //Asking for board piece image?
                 var piece = this.pieces.SingleOrDefault(p => p.IsInLocation(index));
 
                 if(piece != null)
@@ -125,6 +115,7 @@ namespace Common
                     return piece.Texture;
                 }
                
+                //Asking for simulated move image?
                 piece = this.simulatedPieces.FirstOrDefault(p => p.IsInLocation(index));
 
                 if (piece != null)
@@ -132,6 +123,8 @@ namespace Common
                     return piece.Texture;
                 }
 
+
+                //Asking for unused cell image?
                 return @"Images\GroundGravel_Grass.png";
                 
             }
@@ -157,6 +150,43 @@ namespace Common
         {
             this.simulatedPieces.Clear();
             this.OnPropertyChanged("Item[]");
+        }
+
+        public void Rotate(int currentClickPosition)
+        {
+            this.simulatedRotation = null;
+
+            var original = this.pieces.SingleOrDefault(p => p.IsInLocation(currentClickPosition));
+            var rotated = new BoardPiece(original.Index, original.Offsets, original.Rotations, original.Texture) 
+            { CurrentRotation = original.CurrentRotation };
+            
+            for (int x = 0; x < 4; x++)
+            {
+                rotated.Rotate();
+                if (this.IsValidRotationPosition(original, rotated))
+                {
+                    this.simulatedRotation = rotated;
+                    original.CurrentRotation = rotated.CurrentRotation;
+                    break;
+                }
+            }
+            
+            this.OnPropertyChanged("Item[]");
+        }
+
+        private bool IsValidRotationPosition(BoardPiece original, BoardPiece rotated)
+        {
+            //no if piece is not inside the board layout
+            if(rotated.Locations.Any(l=>this.boardLayout.Locations.Contains(l))) return false;
+
+            //no if another piece is occuping the position 
+            foreach(var piece in pieces)
+            {
+                if (piece.GetHashCode() == original.GetHashCode()) continue;//(ignore rotation source)
+                if(rotated.Locations.Any(l=>piece.Locations.Contains(l))) return false;
+            }
+
+            return true;
         }
     }   
 }

@@ -33,8 +33,15 @@ namespace Common
 
         private int[][] rotations;
 
+        public int[][] Rotations
+        {
+            get { return rotations; }
+        }
+
         public string Texture { get; set; }
    
+        //used from the level generator, does not need to call BuildUp or pass an index
+        //because the level generator always calls movetoindex
         public BoardPiece(int[] offsets, int[][] rotations)
         {
             this.offsets = offsets;
@@ -45,6 +52,13 @@ namespace Common
         {
             this.BuildUp(index, offsets);
             this.Texture = texture;
+        }
+
+        public BoardPiece(int index, int[] offsets, int[][] rotations, string texture)
+        {
+            this.BuildUp(index, offsets);
+            this.Texture = texture;
+            this.rotations = rotations;
         }
 
         private void BuildUp(int index, int[] offsets)
@@ -70,13 +84,13 @@ namespace Common
             this.BuildUp(index, this.offsets);
         }
 
-        int currentRotation = -1;
+        public int CurrentRotation = -1;
 
         public void Rotate()
         {
-            currentRotation++;
-            this.offsets = this.rotations[currentRotation];
-            if (currentRotation == 3) currentRotation = -1;
+            this.CurrentRotation++;
+            this.offsets = this.rotations[this.CurrentRotation];
+            if (this.CurrentRotation == 3) this.CurrentRotation = -1;
             this.MoveToIndex(this.Index);
         }
 

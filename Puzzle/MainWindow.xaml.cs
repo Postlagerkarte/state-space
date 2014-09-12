@@ -34,14 +34,12 @@ namespace Puzzle
 
         private void Button_Click(object sender, RoutedEventArgs e)
         {
-
             var boardViewModel = levelGenerator.CreateValidBoard();
             this.boardViewModel = boardViewModel;
             this.ClearBoard();
             this.CreateBoard(boardViewModel);
             this.gameBoard.PreviewMouseLeftButtonDown += gameBoard_PreviewMouseLeftButtonDown;
             this.gameBoard.PreviewMouseLeftButtonUp += gameBoard_PreviewMouseLeftButtonUp;
-        
         }
 
         private void ClearBoard()
@@ -51,28 +49,37 @@ namespace Puzzle
             this.gameBoard.ColumnDefinitions.Clear();
         }
 
-        private int currentIndex = -1; //index of the currently selected piece
+        private int currentClickPosition = -1; //index of the currently selected piece
         
-        void gameBoard_PreviewMouseLeftButtonUp(object sender, MouseButtonEventArgs e)
-        {
-            this.boardViewModel.Drop();
-            this.currentIndex = -1;  //user dropped his piece, no piece is selected now!
-        }
-
         void gameBoard_PreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
         {
-            e.Handled = true; // otherwise we have no mouse-enter events!
-
             var element = e.Source as UIElement;
             var x = Grid.GetColumn(element);
             var y = Grid.GetRow(element);
-            int currentIndex = Helper.GetIndex(y, x);
+            int currentClickPosition = Helper.GetIndex(y, x);
 
-            if (this.boardViewModel.CanPieceMove(currentIndex))
+            if (e.ClickCount == 2)
             {
-                this.boardViewModel.CalculatePossibleMoves(currentIndex);
-                this.currentIndex = currentIndex; //store current index
+                this.boardViewModel.Rotate(currentClickPosition);
             }
+            else
+            {
+                //Prepare to move the piece
+                //the actuall movement is done in mouse-enter event!
+                e.Handled = true; // otherwise we have no mouse-enter events!
+
+                if (this.boardViewModel.CanPieceMove(currentClickPosition))
+                {
+                    this.boardViewModel.CalculatePossibleMoves(currentClickPosition);
+                    this.currentClickPosition = currentClickPosition; //store current index
+                }
+            }
+        }
+
+        void gameBoard_PreviewMouseLeftButtonUp(object sender, MouseButtonEventArgs e)
+        {
+            this.boardViewModel.Drop();
+            this.currentClickPosition = -1;  //user dropped his piece, no piece is selected now!
         }
 
         private void CreateBoard(BoardViewModel boardViewModel)
@@ -98,17 +105,17 @@ namespace Puzzle
 
         void boardCell_MouseEnter(object sender, MouseEventArgs e)
         {
-            if (this.currentIndex == -1) return;
+            if (this.currentClickPosition == -1) return;
 
             var element = e.Source as UIElement;
             var x = Grid.GetColumn(element);
             var y = Grid.GetRow(element);
             int newIndex = Helper.GetIndex(y, x);
 
-            if(this.boardViewModel.CanMoveToIndex(newIndex))
+            if(this.boardViewModel.CanMoveToPosition(newIndex))
             {
-                this.boardViewModel.PreviewDrop(this.currentIndex, newIndex);
-                this.currentIndex = newIndex;
+                this.boardViewModel.PreviewDrop(this.currentClickPosition, newIndex);
+                this.currentClickPosition = newIndex;
             }
         }
     }

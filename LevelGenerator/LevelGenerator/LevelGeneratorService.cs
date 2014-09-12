@@ -34,10 +34,10 @@ namespace LevelGenerator
 
         public BoardViewModel CreateValidBoard()
         {
-            var layout = new List<string>() { "i" };
+            var layout = new List<string>() {"i"};
             //for (int x = 0; x < 5; x++)
             //{
-            //    layout.Add(Board.KnownPieces.ElementAt(r.Next(Board.KnownPieces.Count())).Key);
+                //layout.Add(Board.KnownPieces.ElementAt(r.Next(Board.KnownPieces.Count())).Key);
             //}
             return CreateValidBoard(layout.ToArray());
         }
