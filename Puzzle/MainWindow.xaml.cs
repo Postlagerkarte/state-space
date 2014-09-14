@@ -3,7 +3,6 @@ using LevelGenerator;
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Reactive.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using System.Windows;
@@ -30,11 +29,11 @@ namespace Puzzle
             InitializeComponent();
         }
 
-        LevelGeneratorService levelGenerator = new LevelGeneratorService();
 
         private void Button_Click(object sender, RoutedEventArgs e)
         {
-            var boardViewModel = levelGenerator.CreateValidBoard();
+            LevelGeneratorService lg = new LevelGeneratorService();
+            var boardViewModel = lg.CreateValidBoard();
             this.boardViewModel = boardViewModel;
             this.ClearBoard();
             this.CreateBoard(boardViewModel);

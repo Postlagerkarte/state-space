@@ -2,8 +2,6 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Reactive;
-using System.Reactive.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using System.Windows;
@@ -15,6 +13,7 @@ using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using System.Windows.Navigation;
 using System.Windows.Shapes;
+using System.Reactive.Linq;
 
 namespace Puzzle
 {
@@ -31,11 +30,47 @@ namespace Puzzle
             }
         }
 
+
         public BoardCell(object dataContext, int row, int column)
         {
             InitializeComponent();
 
             this.DataContext = dataContext;
+
+            GlobalEventAggregator.Current.GetEvent<RotationEvent>()
+                .Subscribe(e=>
+            {
+                var cellLocation = Helper.GetIndex(row, column);
+
+                VisualStateManager.GoToState(this, "Default", false);
+
+                if (e.RotationLocations.Contains(cellLocation))
+                {
+                    VisualStateManager.GoToState(this, "Blink", false);
+                    return;
+                }
+
+                if (e.OrginalLocations.Contains(cellLocation))
+                {
+                    VisualStateManager.GoToState(this, "LowOpacity", false);
+                    return;
+                }
+
+               
+            });
+
+            
+            //GlobalEventAggregator.Current.GetEvent<RotationEvent>().Where(x=> Subscribe<RotationEvent>(e =>
+            //    {
+            //        if (e.RotatedIndex == Helper.GetIndex(row, column))
+            //        {
+            //            VisualStateManager.GoToState(myCanvas, "Blink", false);
+            //        }
+            //        else
+            //        {
+            //            VisualStateManager.GoToState(myCanvas, "Default", false);
+            //        }
+            //    });
 
             // this calls into the data context indexer (which is boardviewmodel)
             // and returns the appropriate image for the cell

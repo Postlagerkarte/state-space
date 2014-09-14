@@ -7,11 +7,32 @@
              d:DesignHeight="300"
              d:DesignWidth="300"
              mc:Ignorable="d">
-    <Grid>
+    <Grid x:Name="grid">
         <Grid.RowDefinitions>
             <RowDefinition />
               <!--<RowDefinition />-->  
         </Grid.RowDefinitions>
+        <VisualStateManager.VisualStateGroups>
+            <VisualStateGroup x:Name="Blinking">
+                <VisualState x:Name="Default"/>
+                <VisualState x:Name="Blink">
+                    <Storyboard>
+                        <DoubleAnimation Storyboard.TargetName="myCanvas"
+                                Storyboard.TargetProperty="Opacity"
+                                From="1.0" To="0.6" Duration="0:0:0.7"  
+                                AutoReverse="True" RepeatBehavior="Forever"/>
+                    </Storyboard>
+                </VisualState>
+                <VisualState x:Name="LowOpacity">
+                        <Storyboard>
+                            <DoubleAnimation Storyboard.TargetName="myCanvas"
+                                Storyboard.TargetProperty="Opacity"
+                                From="1.0" To="0.5" Duration="0:0:0.0"
+                                AutoReverse="False"/>
+                        </Storyboard>
+                    </VisualState>
+            </VisualStateGroup>
+        </VisualStateManager.VisualStateGroups>
         <Button x:Name="myCanvas"
                 Margin="-1">
             <Button.Template>

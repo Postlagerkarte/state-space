@@ -167,12 +167,14 @@ namespace Common
                 {
                     this.simulatedRotation = rotated;
                     original.CurrentRotation = rotated.CurrentRotation;
+                    GlobalEventAggregator.Current.Publish<RotationEvent>(new RotationEvent(original.Locations, rotated.Locations));
                     break;
                 }
             }
             
             this.OnPropertyChanged("Item[]");
         }
+
 
         private bool IsValidRotationPosition(BoardPiece original, BoardPiece rotated)
         {
@@ -188,5 +190,10 @@ namespace Common
 
             return true;
         }
-    }   
+
+        public BoardPiece GetPiece(int index)
+        {
+            return this.pieces.Single(p => p.Index == index);
+        }
+    } 
 }

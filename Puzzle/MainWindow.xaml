@@ -13,7 +13,7 @@
         <Grid x:Name="gameBoard" AllowDrop="False"
               ShowGridLines="False" >
             <Grid.Background>
-                <ImageBrush Stretch="Fill" ImageSource="Images/Sand.jpg" AlignmentY="Top" AlignmentX="Center"/>
+                <ImageBrush Stretch="Fill" ImageSource="Images/GroundGravel_Grass.png" AlignmentY="Top" AlignmentX="Center"/>
             </Grid.Background>
             </Grid>
         </Viewbox>  
