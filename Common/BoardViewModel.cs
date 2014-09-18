@@ -42,13 +42,17 @@ namespace Common
             if(this.simulatedRotation.Locations.Contains(clickedPosition))
             {
                 this.pieces.Remove(this.orginialRotation); //delete the orignal piece
-                simulatedRotation.FixIndex();
-                this.pieces.Add(this.simulatedRotation); // add the new piece to the piece list
+
+                var newPiece = this.orginialRotation.GetPieceForRotation();
+
+                this.pieces.Add(newPiece); // add the new piece to the piece list
                 this.simulatedRotation = null; //clear helper variable
                 this.orginialRotation = null; //clear helper variable
 
                 //publish event that rotation has ended: so that blinking effect stops
                 GlobalEventAggregator.Current.Publish(new RotationEvent(new int[] { -1 }, new int[] { -1 })); //is this smart?
+
+                this.OnPropertyChanged("Item[]");
             }
         }
 

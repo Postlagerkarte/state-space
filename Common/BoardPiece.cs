@@ -38,14 +38,32 @@ namespace Common
             get { return rotations; }
         }
 
+        //index-shifting, piece-change
+        private Tuple<int, string>[] transformations;
+
+
+        public BoardPiece GetPieceForRotation()
+        {
+            if (CurrentRotation == -1) throw new InvalidOperationException("piece is not rotated.");
+
+            var transformation = this.transformations[this.CurrentRotation];
+
+            var newPiece = Helper.KnownPieces[transformation.Item2]();
+            newPiece.Texture = this.Texture;
+            newPiece.MoveToIndex(this.index + transformation.Item1);
+
+            return newPiece;
+        }
+
         public string Texture { get; set; }
    
         //used from the level generator, does not need to call BuildUp or pass an index
         //because the level generator always calls movetoindex
-        public BoardPiece(int[] offsets, int[][] rotations)
+        public BoardPiece(int[] offsets, int[][] rotations, Tuple<int,string>[] transformations)
         {
             this.offsets = offsets;
             this.rotations = rotations;
+            this.transformations = transformations;
         }
 
         public BoardPiece(int index, int[] offsets, string texture)
@@ -93,12 +111,6 @@ namespace Common
             this.offsets = this.rotations[this.CurrentRotation];
             if (this.CurrentRotation == 3) this.CurrentRotation = -1;
             this.MoveToIndex(this.Index);
-        }
-
-        //called after rotation has been confiremd.
-        public void FixIndex()
-        {
-            
         }
     }
 }

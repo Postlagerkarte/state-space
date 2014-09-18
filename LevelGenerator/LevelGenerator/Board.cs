@@ -18,37 +18,6 @@ namespace LevelGenerator
         //L: a row of three blocks with one added below the left side.
         //S: two stacked horizontal dominoes with the top one offset to the right.
         //Z: two stacked horizontal dominoes with the top one offset to the left
-
-        public static Dictionary<string, Func<BoardPiece>> KnownPieces = new Dictionary<string, Func<BoardPiece>>()
-        {
-            {"i", ()=>new BoardPiece(
-                new []{8,9,10},
-                new int[4][] 
-                { 
-                    new[] { 0,   1,   2 },
-                    new[] { 0,   8,  16},
-                    new[] { 16, 17,  18},
-                    new[] { 2,  10,  18} 
-                })},
-
-            {"o", ()=>new BoardPiece(new []{0,1,8,9}, null)},
-            //{"t1", ()=>new BoardPiece(new []{0,1,2,9})},
-            //{"t2", ()=>new BoardPiece(new []{1,8,9,10})},
-            //{"t3", ()=>new BoardPiece(new []{1,9,10,17})},
-            //{"t4", ()=>new BoardPiece(new []{1,8,9,17})},
-            //{"j1", ()=>new BoardPiece(new []{0,1,2,10})},
-            //{"j2", ()=>new BoardPiece(new []{2,10,17,18})},
-            //{"j3", ()=>new BoardPiece(new []{0,8,9,10})},
-            //{"j4", ()=>new BoardPiece(new []{0,1,8,16})},
-            //{"l1", ()=>new BoardPiece(new []{0,1,2,8})},
-            //{"l2", ()=>new BoardPiece(new []{1,2,10,18})},
-            //{"l3", ()=>new BoardPiece(new []{2,8,9,10})},
-            //{"l4", ()=>new BoardPiece(new []{0,8,16,17})},
-            //{"s1", ()=>new BoardPiece(new []{1,2,8,9})},
-            //{"s2", ()=>new BoardPiece(new []{0,8,9,17})},
-            //{"z1", ()=>new BoardPiece(new []{0,1,9,10})},
-            //{"z2", ()=>new BoardPiece(new []{1,8,9,16})},
-        };
         
         private static int[] deltas = new[] { -1, 1, 8, -8 };
 
@@ -85,7 +54,7 @@ namespace LevelGenerator
             this.Pieces[0] = board;
 
             //create the player piece
-            var player = KnownPieces["o"](); //create our player 
+            var player = Helper.KnownPieces["o"](); //create our player 
             player.MoveToIndex(9); 
             this.Pieces[1] = player;
 
@@ -94,7 +63,7 @@ namespace LevelGenerator
             //create the other pieces from the layout
             for (int i = 0; i < len; i++)
             {
-               this.Pieces[i + 2] = KnownPieces[layout[i]]();
+               this.Pieces[i + 2] = Helper.KnownPieces[layout[i]]();
             }
         }
 
