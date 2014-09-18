@@ -53,6 +53,8 @@ namespace Common
         }
 
 
+
+
         public bool CanMoveToPosition(int position)
         {
             //no if index is occupied by another piece 
