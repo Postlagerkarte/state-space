@@ -14,6 +14,7 @@ namespace Common
         private List<BoardPiece> pieces = new List<BoardPiece>();
         private List<BoardPiece> simulatedPieces = new List<BoardPiece>();
         private BoardPiece simulatedRotation;
+        private BoardPiece orginialRotation;
         private BoardPiece boardLayout;
 
         public BoardViewModel(BoardPiece boardLayout, List<BoardPiece> pieces)
@@ -26,6 +27,29 @@ namespace Common
         {
             this.pieces.Single(p => p.IsInLocation(oldIndex)).MoveToIndex(newIndex);
             this.OnPropertyChanged("Item[]");
+        }
+
+        public bool IsRotationInProgress
+        {
+            get
+            {
+                return this.simulatedRotation != null;
+            }
+        }
+
+        public void ConfirmOrCancelRotation(int clickedPosition)
+        {
+            if(this.simulatedRotation.Locations.Contains(clickedPosition))
+            {
+                this.pieces.Remove(this.orginialRotation); //delete the orignal piece
+                simulatedRotation.FixIndex();
+                this.pieces.Add(this.simulatedRotation); // add the new piece to the piece list
+                this.simulatedRotation = null; //clear helper variable
+                this.orginialRotation = null; //clear helper variable
+
+                //publish event that rotation has ended: so that blinking effect stops
+                GlobalEventAggregator.Current.Publish(new RotationEvent(new int[] { -1 }, new int[] { -1 })); //is this smart?
+            }
         }
 
 
@@ -166,6 +190,7 @@ namespace Common
                 if (this.IsValidRotationPosition(original, rotated))
                 {
                     this.simulatedRotation = rotated;
+                    this.orginialRotation = original;
                     original.CurrentRotation = rotated.CurrentRotation;
                     GlobalEventAggregator.Current.Publish<RotationEvent>(new RotationEvent(original.Locations, rotated.Locations));
                     break;

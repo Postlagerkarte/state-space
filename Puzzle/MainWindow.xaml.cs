@@ -63,14 +63,19 @@ namespace Puzzle
             }
             else
             {
-                //Prepare to move the piece
-                //the actuall movement is done in mouse-enter event!
                 e.Handled = true; // otherwise we have no mouse-enter events!
 
-                if (this.boardViewModel.CanPieceMove(currentClickPosition))
+                if(this.boardViewModel.IsRotationInProgress)
                 {
-                    this.boardViewModel.CalculatePossibleMoves(currentClickPosition);
-                    this.currentClickPosition = currentClickPosition; //store current index
+                    this.boardViewModel.ConfirmOrCancelRotation(currentClickPosition);
+                }
+                else
+                {
+                    if (this.boardViewModel.CanPieceMove(currentClickPosition))
+                    {
+                        this.boardViewModel.CalculatePossibleMoves(currentClickPosition);
+                        this.currentClickPosition = currentClickPosition; //store current index
+                    }
                 }
             }
         }

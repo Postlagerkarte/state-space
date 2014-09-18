@@ -54,6 +54,7 @@ namespace Common
             this.Texture = texture;
         }
 
+        //used from rotation
         public BoardPiece(int index, int[] offsets, int[][] rotations, string texture)
         {
             this.BuildUp(index, offsets);
@@ -74,9 +75,9 @@ namespace Common
             }
         }
 
-        public bool IsInLocation(int index)
+        public bool IsInLocation(int position)
         {
-            return this.locations.Contains(index);
+            return this.locations.Contains(position);
         }
 
         public void MoveToIndex(int index)
@@ -94,5 +95,10 @@ namespace Common
             this.MoveToIndex(this.Index);
         }
 
+        //called after rotation has been confiremd.
+        public void FixIndex()
+        {
+            
+        }
     }
 }
