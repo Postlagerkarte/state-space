@@ -44,7 +44,7 @@ namespace Puzzle
         private void Button_Click(object sender, RoutedEventArgs e)
         {
             this.currentBoard = lg.CreateBoard();
-            var boardViewModel = lg.CreateViewModelWithTextures(currentBoard);
+            this.boardViewModel = lg.CreateViewModelWithTextures(currentBoard);
             this.Setup(boardViewModel);
         }
 
@@ -138,9 +138,17 @@ namespace Puzzle
             }
         }
 
-        private void Button_ClickSolve(object sender, RoutedEventArgs e)
+        private async void Button_ClickSolve(object sender, RoutedEventArgs e)
         {
-            var solved = this.lg.Solve(this.currentBoard);
+
+            var progress = new Progress<Tuple<long,long>>(i =>
+            {
+                this.txtBoardsLeft.Text = i.Item1.ToString();
+                this.txtBoardsExplored.Text = i.Item2.ToString();
+            });
+
+            var solved = await Task.Run(()=> this.lg.Solve(this.currentBoard, progress));
+
 
             // Reverse the solved->start parent chain
             Debug.Assert(null != solved);
@@ -160,6 +168,7 @@ namespace Puzzle
             var board = solution.Pop();
             var bvm = new BoardViewModel(board.Pieces[0], board.Pieces.Skip(1).ToList());
             this.Setup(bvm);
+            this.boardViewModel = bvm;
         }
     }
 }

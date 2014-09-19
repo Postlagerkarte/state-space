@@ -21,6 +21,15 @@
         <Button Click="Button_Click">Next</Button>
         <Button Click="Button_ClickSolve">Solve</Button>
         <Button Click="Button_ClickShowSolution">Show Solution</Button>
+        <StackPanel Orientation="Horizontal">
+            <TextBlock>Boards left:</TextBlock>
+            <TextBlock x:Name="txtBoardsLeft"></TextBlock>
+        </StackPanel>
+
+            <StackPanel Orientation="Horizontal">
+                <TextBlock>Boards explored:</TextBlock>
+                <TextBlock x:Name="txtBoardsExplored"></TextBlock>
+            </StackPanel>
         </StackPanel>
     </Grid>
 </Window>

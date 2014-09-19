@@ -33,8 +33,8 @@ namespace LevelGenerator
         }
 
         public Board CreateBoard()
-        { 
-            var layout = new List<string>() {"o"};
+        {
+            var layout = new List<string>() { "o", "i1", "i2", "i1", "i2", "i1", "i2", "o" };
             //for (int x = 0; x < 5; x++)
             //{
                 //layout.Add(Board.KnownPieces.ElementAt(r.Next(Board.KnownPieces.Count())).Key);
@@ -62,7 +62,7 @@ namespace LevelGenerator
             return new BoardViewModel(board.Pieces[0], board.Pieces.Skip(1).ToList());
         }
 
-        public Board Solve(Board input)
+        public Board Solve(Board input, IProgress<Tuple<long,long>> progress)
         {
             var start = input;
 
@@ -72,11 +72,16 @@ namespace LevelGenerator
             todo.Enqueue(start);
             seen.Add(start);
 
+            long explored = 0;
             // Keep going as long as there are unseen states...
             while (0 < todo.Count)
             {
+
+
                 // Get the next board and process its moves
                 var board = todo.Dequeue();
+                explored++;
+                progress.Report(Tuple.Create(todo.LongCount(), explored));
                 foreach (var move in board.GetMoves())
                 {
                     if (move.IsSolved)
