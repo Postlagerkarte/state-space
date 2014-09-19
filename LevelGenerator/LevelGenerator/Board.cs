@@ -31,11 +31,11 @@ namespace LevelGenerator
         {
        
             this.locations = locations;
-            int len = Pieces.Length - 2;
-            //move the pieces (excpet player and board) to their desired indexes
+            int len = Pieces.Length - 1;
+            //move the pieces (excpet the board) to their desired indexes
             for (int i = 0; i < len; i++)
             {
-                this.Pieces[i + 2].MoveToIndex(locations[i]);
+                this.Pieces[i + 1].MoveToIndex(locations[i]);
             }
 
             return this.IsValid;
@@ -47,23 +47,20 @@ namespace LevelGenerator
   
         public Board(string[] layout)
         {
-            this.Pieces = new BoardPiece[layout.Length + 2];
             this.layout = layout;
+
+            //create piece array: must have one extra slot for the board itself!
+            this.Pieces = new BoardPiece[layout.Length + 1];
+
             //create the board, must be the first element in the pieces collection(!)
             var board = new BoardPiece(0, new[] { 0, 1, 2, 3, 4, 5, 6, 7, 8, 15, 16, 23, 24, 31, 32, 39, 40, 47, 48, 55, 56, 57, 58, 59, 60, 61, 62, 63 }, "Wall_Brown");
             this.Pieces[0] = board;
 
-            //create the player piece
-            var player = Helper.KnownPieces["o"](); //create our player 
-            player.MoveToIndex(9); 
-            this.Pieces[1] = player;
-
             //create the other pieces
-            int len = Pieces.Length - 2;
-            //create the other pieces from the layout
+            int len = Pieces.Length - 1;
             for (int i = 0; i < len; i++)
             {
-               this.Pieces[i + 2] = Helper.KnownPieces[layout[i]]();
+               this.Pieces[i + 1] = Helper.KnownPieces[layout[i]]();
             }
         }
 
@@ -71,6 +68,14 @@ namespace LevelGenerator
         private Board(Board parent, int[] locations)
         {
             Parent = parent;
+
+            this.Pieces = new BoardPiece[parent.Pieces.Count()];
+
+            for (int x = 0; x < parent.Pieces.Count(); x++)
+            {
+                this.Pieces[x] = parent.Pieces[x].Clone();
+            }
+                
             this.SetUpBoard(locations);
         }
 
@@ -85,7 +90,7 @@ namespace LevelGenerator
                 {
                     // ... to create the corresponding board...
                     var locations = (int[])this.locations.Clone();
-                    locations[i] += delta;
+                    locations[i-1] += delta;
                     var board = new Board(this, locations);
                     // ... and return it if it's valid
                     if (board.IsValid)
@@ -94,7 +99,15 @@ namespace LevelGenerator
                     }
                  
                 }
-            }
+
+                //for(int x=0; x<4; x++)
+                //{
+                //    Pieces[i].Rotate();
+                //    Pieces[i].GetPieceForRotation();
+                //}
+                
+                
+                }
 
             // Try to move each piece (except for the board)...
             //for (var p = 0; p < _pieces.Count - 1; p++)
@@ -153,7 +166,7 @@ namespace LevelGenerator
             get
             {
                 // All that matters in *this* puzzle is whether the 'A' piece is at its destination
-                return (56 == this.locations[0]);
+                return (45 == this.locations[0]);
             }
         }
 

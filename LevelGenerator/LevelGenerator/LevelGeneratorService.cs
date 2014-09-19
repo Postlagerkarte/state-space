@@ -32,27 +32,28 @@ namespace LevelGenerator
 
         }
 
-        public BoardViewModel CreateValidBoard()
-        {
-            var layout = new List<string>() {"i1","i2"};
+        public Board CreateBoard()
+        { 
+            var layout = new List<string>() {"o"};
             //for (int x = 0; x < 5; x++)
             //{
                 //layout.Add(Board.KnownPieces.ElementAt(r.Next(Board.KnownPieces.Count())).Key);
             //}
-            return CreateValidBoard(layout.ToArray());
+            var board = CreateValidBoard(layout.ToArray());
+            return board; 
         }
 
-        public BoardViewModel CreateValidBoard(string[] layout)
+        public Board CreateValidBoard(string[] layout)
         {
             Board board = new Board(layout);
             tryAgain:
-            var locations = CreateUnseenLocationArray();
+            var locations = CreateUnseenLocationArray(layout.Length);
             if (!board.SetUpBoard(locations)) goto tryAgain;
 
-            return this.CreateViewModel(board);
+            return board;
         }
 
-        public BoardViewModel CreateViewModel(Board board)
+        public BoardViewModel CreateViewModelWithTextures(Board board)
         {
             TexturePool textures = new TexturePool();
             board.Pieces[0].Texture = @"\Images\Wall_Brown.png";
@@ -61,24 +62,55 @@ namespace LevelGenerator
             return new BoardViewModel(board.Pieces[0], board.Pieces.Skip(1).ToList());
         }
 
-        public void Solve()
+        public Board Solve(Board input)
         {
+            var start = input;
 
+            Board solved = null;
+            var seen = new HashSet<Board>(start); // IEqualityComparer<Board>
+            var todo = new Queue<Board>();
+            todo.Enqueue(start);
+            seen.Add(start);
+
+            // Keep going as long as there are unseen states...
+            while (0 < todo.Count)
+            {
+                // Get the next board and process its moves
+                var board = todo.Dequeue();
+                foreach (var move in board.GetMoves())
+                {
+                    if (move.IsSolved)
+                    {
+                        // Solved!
+                        solved = move;
+                        todo.Clear();
+                        break;
+                    }
+                    if (!seen.Contains(move))
+                    {
+                        // Enqueue the new state
+                        todo.Enqueue(move);
+                        seen.Add(move);
+                    }
+                }
+            }
+
+            return solved;
         }
 
         private Dictionary<int, int> hashSet = new Dictionary<int, int>();
 
-        private int[] CreateUnseenLocationArray()
+        private int[] CreateUnseenLocationArray(int size)
         {
             tryAgain:
-            var iArray = new int[7];
-            iArray[0] = this.possibleIndexLocations[r.Next(33)];
-            iArray[1] = this.possibleIndexLocations[r.Next(33)];
-            iArray[2] = this.possibleIndexLocations[r.Next(33)];
-            iArray[3] = this.possibleIndexLocations[r.Next(33)];
-            iArray[4] = this.possibleIndexLocations[r.Next(33)];
-            iArray[5] = this.possibleIndexLocations[r.Next(33)];
-            iArray[6] = this.possibleIndexLocations[r.Next(33)];
+            var iArray = new int[size];
+            iArray[0] = 9; //player piece
+
+            for (int i = 1; i < size; i++)
+            {
+                iArray[i] = this.possibleIndexLocations[r.Next(33)];
+            }
+
             int hash = GetHash(iArray);
             if (hashSet.ContainsKey(hash)) goto tryAgain;
             hashSet.Add(hash, hash);

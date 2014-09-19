@@ -16,7 +16,11 @@
                 <ImageBrush Stretch="Fill" ImageSource="Images/GroundGravel_Grass.png" AlignmentY="Top" AlignmentX="Center"/>
             </Grid.Background>
             </Grid>
-        </Viewbox>  
-        <Button Grid.Row="1" Click="Button_Click">Next</Button>
+        </Viewbox>
+        <StackPanel Grid.Row="1">
+        <Button Click="Button_Click">Next</Button>
+        <Button Click="Button_ClickSolve">Solve</Button>
+        <Button Click="Button_ClickShowSolution">Show Solution</Button>
+        </StackPanel>
     </Grid>
 </Window>

@@ -2,6 +2,7 @@
 using LevelGenerator;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
@@ -23,22 +24,35 @@ namespace Puzzle
     public partial class MainWindow : Window
     {
         private BoardViewModel boardViewModel;
+        private LevelGeneratorService lg = new LevelGeneratorService();
+        private Board currentBoard;
 
         public MainWindow()
         {
             InitializeComponent();
+
+            this.Loaded += MainWindow_Loaded;
+        }
+
+        void MainWindow_Loaded(object sender, RoutedEventArgs e)
+        {
+            this.gameBoard.PreviewMouseLeftButtonDown += gameBoard_PreviewMouseLeftButtonDown;
+            this.gameBoard.PreviewMouseLeftButtonUp += gameBoard_PreviewMouseLeftButtonUp;
         }
 
 
         private void Button_Click(object sender, RoutedEventArgs e)
         {
-            LevelGeneratorService lg = new LevelGeneratorService();
-            var boardViewModel = lg.CreateValidBoard();
-            this.boardViewModel = boardViewModel;
+            this.currentBoard = lg.CreateBoard();
+            var boardViewModel = lg.CreateViewModelWithTextures(currentBoard);
+            this.Setup(boardViewModel);
+        }
+
+        private void Setup(BoardViewModel boardViewModel)
+        {
             this.ClearBoard();
-            this.CreateBoard(boardViewModel);
-            this.gameBoard.PreviewMouseLeftButtonDown += gameBoard_PreviewMouseLeftButtonDown;
-            this.gameBoard.PreviewMouseLeftButtonUp += gameBoard_PreviewMouseLeftButtonUp;
+            this.CreateGameGrid(boardViewModel);
+            boardViewModel.Refresh();
         }
 
         private void ClearBoard()
@@ -87,7 +101,7 @@ namespace Puzzle
             this.currentClickPosition = -1;  //user dropped his piece, no piece is selected now!
         }
 
-        private void CreateBoard(BoardViewModel boardViewModel)
+        private void CreateGameGrid(BoardViewModel boardViewModel)
         {
             var rows = Enumerable.Range(0, Helper.BoardHeight).ToArray();
             var columns = Enumerable.Range(0, Helper.BoardWidth).ToArray();
@@ -122,6 +136,30 @@ namespace Puzzle
                 this.boardViewModel.PreviewDrop(this.currentClickPosition, newIndex);
                 this.currentClickPosition = newIndex;
             }
+        }
+
+        private void Button_ClickSolve(object sender, RoutedEventArgs e)
+        {
+            var solved = this.lg.Solve(this.currentBoard);
+
+            // Reverse the solved->start parent chain
+            Debug.Assert(null != solved);
+            solution = new Stack<Board>();
+            while (null != solved)
+            {
+                solution.Push(solved);
+                solved = solved.Parent;
+            }
+
+        }
+
+        private Stack<Board> solution;
+
+        private void Button_ClickShowSolution(object sender, RoutedEventArgs e)
+        {
+            var board = solution.Pop();
+            var bvm = new BoardViewModel(board.Pieces[0], board.Pieces.Skip(1).ToList());
+            this.Setup(bvm);
         }
     }
 }

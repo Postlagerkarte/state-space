@@ -5,7 +5,7 @@ using System.Text;
 
 namespace Common
 {
-    public class BoardPiece
+    public class BoardPiece 
     {
         private int index;
         private int[] offsets;
@@ -111,6 +111,11 @@ namespace Common
             if (this.CurrentRotation == 4) this.CurrentRotation = 0;
             this.offsets = this.rotations[this.CurrentRotation];
             this.MoveToIndex(this.Index);
+        }
+
+        public BoardPiece Clone()
+        {
+            return (BoardPiece)this.MemberwiseClone();
         }
     }
 }

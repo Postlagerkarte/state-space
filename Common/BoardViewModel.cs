@@ -226,5 +226,10 @@ namespace Common
         {
             return this.pieces.Single(p => p.Index == index);
         }
+
+        public void Refresh()
+        {
+            this.OnPropertyChanged("Item[]");
+        }
     } 
 }
