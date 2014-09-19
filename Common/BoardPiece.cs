@@ -38,7 +38,7 @@ namespace Common
             get { return rotations; }
         }
 
-        //index-shifting, piece-change
+        //tuple is: (index-shifting, piece-change)
         private Tuple<int, string>[] transformations;
 
 
@@ -108,8 +108,8 @@ namespace Common
         public void Rotate()
         {
             this.CurrentRotation++;
+            if (this.CurrentRotation == 4) this.CurrentRotation = 0;
             this.offsets = this.rotations[this.CurrentRotation];
-            if (this.CurrentRotation == 3) this.CurrentRotation = -1;
             this.MoveToIndex(this.Index);
         }
     }

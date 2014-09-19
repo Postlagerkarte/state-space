@@ -45,6 +45,7 @@
     <Compile Include="PrismStripped\WeakEventHandlerManager.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="RotationEvent.cs" />
+    <Compile Include="RotationFinishedEvent.cs" />
   </ItemGroup>
   <ItemGroup>
     <Reference Include="Reactive.EventAggregator">
@@ -59,9 +60,6 @@
     <Reference Include="System.Reactive.Linq">
       <HintPath>..\packages\Rx-Linq.2.1.30214.0\lib\Portable-Net45+WinRT45+WP8\System.Reactive.Linq.dll</HintPath>
     </Reference>
-  </ItemGroup>
-  <ItemGroup>
-    <None Include="packages.config" />
   </ItemGroup>
   <Import Project="$(MSBuildExtensionsPath32)\Microsoft\Portable\$(TargetFrameworkVersion)\Microsoft.Portable.CSharp.targets" />
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 

@@ -59,18 +59,11 @@ namespace Puzzle
                
             });
 
-            
-            //GlobalEventAggregator.Current.GetEvent<RotationEvent>().Where(x=> Subscribe<RotationEvent>(e =>
-            //    {
-            //        if (e.RotatedIndex == Helper.GetIndex(row, column))
-            //        {
-            //            VisualStateManager.GoToState(myCanvas, "Blink", false);
-            //        }
-            //        else
-            //        {
-            //            VisualStateManager.GoToState(myCanvas, "Default", false);
-            //        }
-            //    });
+
+            GlobalEventAggregator.Current.GetEvent<RotationFinishedEvent>().Subscribe<RotationFinishedEvent>((e) =>
+            {
+                    VisualStateManager.GoToState(myCanvas, "Default", false);
+            });
 
             // this calls into the data context indexer (which is boardviewmodel)
             // and returns the appropriate image for the cell

@@ -57,7 +57,8 @@ namespace Puzzle
             var y = Grid.GetRow(element);
             int currentClickPosition = Helper.GetIndex(y, x);
 
-            if (e.ClickCount == 2)
+            //Rotation is only allowed if currently no rotation is in progress
+            if (e.ClickCount == 2 && !this.boardViewModel.IsRotationInProgress)
             {
                 this.boardViewModel.Rotate(currentClickPosition);
             }
