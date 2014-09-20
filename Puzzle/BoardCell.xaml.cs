@@ -60,9 +60,9 @@ namespace Puzzle
             });
 
 
-            GlobalEventAggregator.Current.GetEvent<RotationFinishedEvent>().Subscribe<RotationFinishedEvent>((e) =>
+            GlobalEventAggregator.Current.GetEvent<RotationFinishedEvent>().Subscribe((e) =>
             {
-                    VisualStateManager.GoToState(myCanvas, "Default", false);
+                    VisualStateManager.GoToState(this, "Default", false);
             });
 
             // this calls into the data context indexer (which is boardviewmodel)

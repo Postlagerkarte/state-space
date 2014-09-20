@@ -66,17 +66,10 @@ namespace Puzzle
         
         void gameBoard_PreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
         {
-            var element = e.Source as UIElement;
-            var x = Grid.GetColumn(element);
-            var y = Grid.GetRow(element);
-            int currentClickPosition = Helper.GetIndex(y, x);
+            int currentClickPosition = this.GetCurrentClickPosition(e.Source as UIElement);
+            var clickType = (ClickType)e.ClickCount;
 
-            //Rotation is only allowed if currently no rotation is in progress
-            if (e.ClickCount == 2 && !this.boardViewModel.IsRotationInProgress)
-            {
-                this.boardViewModel.Rotate(currentClickPosition);
-            }
-            else
+            if(clickType == ClickType.SingleClick)
             {
                 e.Handled = true; // otherwise we have no mouse-enter events!
 
@@ -93,6 +86,22 @@ namespace Puzzle
                     }
                 }
             }
+            else if (clickType == ClickType.DoubleClick)
+            {
+                //rotate piece if no rotation is in progess
+                if(!this.boardViewModel.IsRotationInProgress)
+                {
+                    this.boardViewModel.Rotate(currentClickPosition);
+                }
+            }   
+        }
+
+        private int GetCurrentClickPosition(UIElement element)
+        {
+            var x = Grid.GetColumn(element);
+            var y = Grid.GetRow(element);
+            int currentClickPosition = Helper.GetIndex(y, x);
+            return currentClickPosition;
         }
 
         void gameBoard_PreviewMouseLeftButtonUp(object sender, MouseButtonEventArgs e)
@@ -165,10 +174,16 @@ namespace Puzzle
 
         private void Button_ClickShowSolution(object sender, RoutedEventArgs e)
         {
-            var board = solution.Pop();
+             var board = solution.Pop();
             var bvm = new BoardViewModel(board.Pieces[0], board.Pieces.Skip(1).ToList());
             this.Setup(bvm);
             this.boardViewModel = bvm;
         }
+    }
+
+    public enum ClickType
+    {
+        SingleClick = 1,
+        DoubleClick = 2
     }
 }

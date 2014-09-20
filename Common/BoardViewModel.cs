@@ -50,7 +50,7 @@ namespace Common
                 this.orginialRotation = null; //clear helper variable
 
                 //publish event that rotation has ended: so that blinking effect stops
-                GlobalEventAggregator.Current.Publish(new RotationFinishedEvent()); 
+                GlobalEventAggregator.Current.Publish(new RotationFinishedEvent());
 
                 this.OnPropertyChanged("Item[]");
             }
