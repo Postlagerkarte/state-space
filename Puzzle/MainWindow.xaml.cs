@@ -66,34 +66,45 @@ namespace Puzzle
         
         void gameBoard_PreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
         {
-            int currentClickPosition = this.GetCurrentClickPosition(e.Source as UIElement);
+            int currentClickPosition = GetCurrentClickPosition(e.Source as UIElement);
             var clickType = (ClickType)e.ClickCount;
 
             if(clickType == ClickType.SingleClick)
             {
                 e.Handled = true; // otherwise we have no mouse-enter events!
 
-                if(this.boardViewModel.IsRotationInProgress)
-                {
-                    this.boardViewModel.ConfirmOrCancelRotation(currentClickPosition);
-                }
-                else
-                {
-                    if (this.boardViewModel.CanPieceMove(currentClickPosition))
-                    {
-                        this.boardViewModel.CalculatePossibleMoves(currentClickPosition);
-                        this.currentClickPosition = currentClickPosition; //store current index
-                    }
-                }
+                HandleSingleClick(currentClickPosition);
             }
             else if (clickType == ClickType.DoubleClick)
             {
-                //rotate piece if no rotation is in progess
-                if(!this.boardViewModel.IsRotationInProgress)
-                {
-                    this.boardViewModel.Rotate(currentClickPosition);
-                }
+                HandleDoubleClick(currentClickPosition);
             }   
+        }
+
+        private void HandleDoubleClick(int currentClickPosition)
+        {
+            //rotate piece if no rotation is in progess
+            if (!this.boardViewModel.IsRotationInProgress)
+            {
+                this.boardViewModel.Rotate(currentClickPosition);
+            }
+        }
+
+        private void HandleSingleClick(int currentClickPosition)
+        {
+            if (boardViewModel.IsRotationInProgress)
+            {
+                boardViewModel.ConfirmOrCancelRotation(currentClickPosition);
+            }
+            else
+            {
+                if (boardViewModel.CanPieceMove(currentClickPosition))
+                {
+                    boardViewModel.CalculatePossibleMoves(currentClickPosition);
+                    boardViewModel.HighlightPiece(currentClickPosition);
+                    this.currentClickPosition = currentClickPosition; //store current click position                  
+                }
+            }
         }
 
         private int GetCurrentClickPosition(UIElement element)

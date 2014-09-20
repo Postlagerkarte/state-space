@@ -38,6 +38,7 @@
     <Compile Include="BoardViewModel.cs" />
     <Compile Include="GlobalEventAggregator.cs" />
     <Compile Include="Helper.cs" />
+    <Compile Include="HighlightEvent.cs" />
     <Compile Include="PrismStripped\BindableBase.cs" />
     <Compile Include="PrismStripped\DelegateCommand.cs" />
     <Compile Include="PrismStripped\DelegateCommandBase.cs" />

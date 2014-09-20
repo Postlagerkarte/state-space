@@ -40,12 +40,12 @@
                     <Image Source="{Binding Tag,
                                             RelativeSource={RelativeSource FindAncestor,
                                                                            AncestorType={x:Type Button}}}"
-                           Stretch="Fill" />
+                           Stretch="Fill" >
+                    </Image>
                 </ControlTemplate>
             </Button.Template>
         </Button>
-        
-            <!--<TextBlock x:Name="dbg"
+        <!--<TextBlock x:Name="dbg"
             Grid.Row="1"
             Text="dbg" />-->
         

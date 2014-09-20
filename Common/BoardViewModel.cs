@@ -74,7 +74,7 @@ namespace Common
         {
             this.simulatedPieces.Clear();
 
-            var simPieceTexture = @"Images\Wall_Beige.png";
+            var simPieceTexture = @"Images\GroundGravel_Grass.png";
 
             var simulatedPiece = new BoardPiece(selectedPiece.Index, selectedPiece.Offsets, simPieceTexture);
             this.simulatedPieces.Add(simulatedPiece);
@@ -230,6 +230,12 @@ namespace Common
         public void Refresh()
         {
             this.OnPropertyChanged("Item[]");
+        }
+
+        public void HighlightPiece(int currentClickPosition)
+        {
+            var piece = this.pieces.SingleOrDefault(p => p.IsInLocation(currentClickPosition));
+            GlobalEventAggregator.Current.Publish(new HighlightEvent(piece.Locations));
         }
     } 
 }
