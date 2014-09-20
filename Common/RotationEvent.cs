@@ -8,13 +8,11 @@ namespace Common
 {
     public class RotationEvent
     {
-        public RotationEvent(int[] orginalLocations, int[] rotationLocations)
+        public RotationEvent(int[] rotationLocations)
         {
-            this.OrginalLocations = orginalLocations;
             this.RotationLocations = rotationLocations;
         }
 
-        public int[] OrginalLocations { get; set; }
         public int[] RotationLocations { get; set; }
     }
 }

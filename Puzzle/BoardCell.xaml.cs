@@ -48,15 +48,7 @@ namespace Puzzle
                 {
                     VisualStateManager.GoToState(this, "Blink", false);
                     return;
-                }
-
-                if (e.OrginalLocations.Contains(cellLocation))
-                {
-                    VisualStateManager.GoToState(this, "LowOpacity", false);
-                    return;
-                }
-
-               
+                }             
             });
 
 

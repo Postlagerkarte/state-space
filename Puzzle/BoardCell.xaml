@@ -19,8 +19,8 @@
                     <Storyboard>
                         <DoubleAnimation Storyboard.TargetName="myCanvas"
                                 Storyboard.TargetProperty="Opacity"
-                                From="1.0" To="0.6" Duration="0:0:0.7"  
-                                AutoReverse="True" RepeatBehavior="Forever"/>
+                                From="1.0" To="0.1" Duration="0:0:0.4"  
+                                AutoReverse="True"/>
                     </Storyboard>
                 </VisualState>
                 <VisualState x:Name="LowOpacity">

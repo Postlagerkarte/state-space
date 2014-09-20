@@ -73,31 +73,6 @@ namespace Puzzle
             {
                 e.Handled = true; // otherwise we have no mouse-enter events!
 
-                HandleSingleClick(currentClickPosition);
-            }
-            else if (clickType == ClickType.DoubleClick)
-            {
-                HandleDoubleClick(currentClickPosition);
-            }   
-        }
-
-        private void HandleDoubleClick(int currentClickPosition)
-        {
-            //rotate piece if no rotation is in progess
-            if (!this.boardViewModel.IsRotationInProgress)
-            {
-                this.boardViewModel.Rotate(currentClickPosition);
-            }
-        }
-
-        private void HandleSingleClick(int currentClickPosition)
-        {
-            if (boardViewModel.IsRotationInProgress)
-            {
-                boardViewModel.ConfirmOrCancelRotation(currentClickPosition);
-            }
-            else
-            {
                 if (boardViewModel.CanPieceMove(currentClickPosition))
                 {
                     boardViewModel.CalculatePossibleMoves(currentClickPosition);
@@ -105,7 +80,12 @@ namespace Puzzle
                     this.currentClickPosition = currentClickPosition; //store current click position                  
                 }
             }
+            else if (clickType == ClickType.DoubleClick)
+            {
+                this.boardViewModel.Rotate(currentClickPosition);    
+            }   
         }
+
 
         private int GetCurrentClickPosition(UIElement element)
         {

@@ -31,15 +31,11 @@ namespace Common
         {
                 {"i1", ()=>new BoardPiece(
                     new []{8,9,10}, // Location
-                    new int[1][]  // Rotation
+                    new int [1][]  // Rotation
                     { 
                         new[] { 1, 9,  17}
                     }, 
-                    new Tuple<int,string>[1] //Transformation (index-shifting, piece-changing)
-                    {
-                        Tuple.Create(0, "i2")
-                    }
-                    
+                    new []{"i2"}
                     )},
 
                {"i2", ()=>new BoardPiece(
@@ -48,10 +44,7 @@ namespace Common
                 { 
                     new[] { 8,   9,   10 }
                 },
-                new Tuple<int,string>[1]
-                {
-                        Tuple.Create(0, "i1"),
-                }
+                new []{"i1"}
                 )},
 
                 {"t1", ()=>new BoardPiece(
@@ -59,16 +52,51 @@ namespace Common
                     new int[4][] 
                     { 
                         new[] { 1,9,10,17},
-                        new[] { 1,8,9,17},
                         new[] { 1,8,9,10},
-                        new[] { 1,9,10,17},
+                        new[] { 1,8,9,17},
+                        new[] { 8,9,10,17},
 
                     },
-                    null
+                    new []{"t2","t3","t4","t1"}
                     )},
-                {"t2", ()=>new BoardPiece(new []{1,8,9,10}, null, null)},
-                {"t3", ()=>new BoardPiece(new []{1,9,10,17}, null, null)},
-                {"t4", ()=>new BoardPiece(new []{1,8,9,17}, null, null)},
+                
+                {"t2", ()=>new BoardPiece(
+                    new []{1,9,10,17},
+                      new int[4][] 
+                    { 
+                        new[] { 1,8,9,10},
+                        new[] { 1,8,9,17},
+                        new[] { 8,9,10,17},
+                        new[] { 1,9,10,17}
+
+                    },
+                    new []{"t3","t4","t1","t2"}
+                    )},
+                
+                {"t3", ()=>new BoardPiece(
+                    new []{1,8,9,10},
+                    new int[4][] 
+                    { 
+                        new[] { 1,8,9,17},
+                        new[] { 8,9,10,17},
+                        new[] { 1,9,10,17},
+                        new[] { 1,8,9,10},
+
+                    },
+                    new []{"t4","t1","t2","t3"}
+                    )},
+                    
+                 {"t4", ()=>new BoardPiece(
+                     new []{1,8,9,17},
+                     new int[4][] 
+                    { 
+                        new[] { 8,9,10,17},
+                        new[] { 1,9,10,17},
+                        new[] { 1,8,9,10},
+                        new[] { 1,8,9,17}
+                    },
+                     new []{"t1","t2","t3","t4"}
+                     )},
 
             {"o", ()=>new BoardPiece(new []{0,1,8,9}, null, null)},
 
