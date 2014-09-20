@@ -182,7 +182,7 @@ namespace Common
             this.OnPropertyChanged("Item[]");
         }
 
-        public void Rotate(int currentClickPosition)
+        public void  Rotate(int currentClickPosition)
         {
             this.simulatedRotation = null;
 
@@ -190,7 +190,7 @@ namespace Common
             var rotated = new BoardPiece(original.Index, original.Offsets, original.Rotations, original.Texture) 
             { CurrentRotation = original.CurrentRotation };
             
-            for (int x = 0; x < 4; x++)
+            for (int x = 0; x < original.Rotations.Count(); x++)
             {
                 rotated.Rotate();
                 if (this.IsValidRotationPosition(original, rotated))
