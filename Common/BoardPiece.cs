@@ -40,6 +40,11 @@ namespace Common
 
         private string[] transformations;
 
+        public string[] Transformations
+        {
+            get { return transformations; }
+        }
+
 
 
         public string Texture { get; set; }

@@ -34,7 +34,7 @@ namespace LevelGenerator
 
         public Board CreateBoard()
         {
-            var layout = new List<string>() { "o", "t1","t2","t3","t4" };
+            var layout = new List<string>() {"o", "t2","t1" };
             //for (int x = 0; x < 5; x++)
             //{
                 //layout.Add(Board.KnownPieces.ElementAt(r.Next(Board.KnownPieces.Count())).Key);
@@ -64,13 +64,14 @@ namespace LevelGenerator
 
         public Board Solve(Board input, IProgress<Tuple<long,long>> progress)
         {
+            Dictionary<int, int> hashSet = new Dictionary<int, int>();
             var start = input;
 
             Board solved = null;
-            var seen = new HashSet<Board>(start); // IEqualityComparer<Board>
             var todo = new Queue<Board>();
             todo.Enqueue(start);
-            seen.Add(start);
+            var startHash = this.GetHash(start);
+            hashSet.Add(startHash, startHash);
 
             long explored = 0;
             // Keep going as long as there are unseen states...
@@ -91,16 +92,24 @@ namespace LevelGenerator
                         todo.Clear();
                         break;
                     }
-                    if (!seen.Contains(move))
+                    int hash = GetHash(move);
+                    if (!hashSet.ContainsKey(hash))
                     {
                         // Enqueue the new state
                         todo.Enqueue(move);
-                        seen.Add(move);
+                        hashSet.Add(hash, hash);
                     }
                 }
             }
 
             return solved;
+        }
+
+        private int GetHash(Board move)
+        {
+            int[] locations = new int[move.Pieces.Skip(1).Sum(x => x.Locations.Length)];
+            var result = move.Pieces.Skip(1).SelectMany(x => x.Locations).ToArray();
+            return GetHash(result);
         }
 
         private Dictionary<int, int> hashSet = new Dictionary<int, int>();

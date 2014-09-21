@@ -26,7 +26,6 @@ namespace Common
             return !source.Any(predicate);
         }
 
-
         public static Dictionary<string, Func<BoardPiece>> KnownPieces = new Dictionary<string, Func<BoardPiece>>()
         {
                 {"i1", ()=>new BoardPiece(
