@@ -100,7 +100,7 @@ namespace Common
         public void Rotate()
         {
             this.CurrentRotation++;
-            if (this.CurrentRotation == 4) this.CurrentRotation = 0;
+            if (this.CurrentRotation == this.Rotations.Length) this.CurrentRotation = 0;
             this.offsets = this.rotations[this.CurrentRotation];
             this.MoveToIndex(this.Index);
         }

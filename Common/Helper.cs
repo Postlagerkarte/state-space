@@ -30,20 +30,22 @@ namespace Common
         {
                 {"i1", ()=>new BoardPiece(
                     new []{8,9,10}, // Location
-                    new int [1][]  // Rotation
+                    new int [2][]  // Rotation
                     { 
-                        new[] { 1, 9,  17}
+                        new[] { 1, 9,  17},
+                        new[] { 8, 9,  10}
                     }, 
-                    new []{"i2"}
+                    new []{"i2", "i1"}
                     )},
 
                {"i2", ()=>new BoardPiece(
                 new []{1,9,17},
-                new int[1][] 
+                new int[2][] 
                 { 
-                    new[] { 8,   9,   10 }
+                    new[] { 8,   9,   10 },
+                    new[] { 1, 9,  17}
                 },
-                new []{"i1"}
+                new []{"i1", "i2"}
                 )},
 
                 {"t1", ()=>new BoardPiece(

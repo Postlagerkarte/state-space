@@ -70,6 +70,7 @@ namespace LevelGenerator
                 if (x == i)
                 {
                     this.Pieces[x] = Helper.KnownPieces[pieceName]();
+                    this.Pieces[x].Texture = parent.Pieces[x].Texture;
                 }
                 else
                 {

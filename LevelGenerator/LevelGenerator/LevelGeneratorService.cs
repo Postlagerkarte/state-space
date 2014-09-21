@@ -34,7 +34,7 @@ namespace LevelGenerator
 
         public Board CreateBoard()
         {
-            var layout = new List<string>() {"o", "t2","t1" };
+            var layout = new List<string>() { "o", "o", "o", "i1", "i2", "t1" , "t2"};
             //for (int x = 0; x < 5; x++)
             //{
                 //layout.Add(Board.KnownPieces.ElementAt(r.Next(Board.KnownPieces.Count())).Key);
