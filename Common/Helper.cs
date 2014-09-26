@@ -190,14 +190,61 @@ namespace Common
                      new []{"j1","j2","j3","j4"}
                      )},
 
+                 {"l1", ()=>new BoardPiece(
+                    new []{0,1,2,8},
+                    new int[4][] 
+                    { 
+                        new[] { 1,2,10,18},
+                        new[] { 2,8,9,10},
+                        new[] { 0,8,16,17},
+                        new[] { 0,1,2,8},
+
+                    },
+                    new []{"l2","l3","l4","l1"}
+                    )},
+                
+                {"l2", ()=>new BoardPiece(
+                    new []{1,2,10,18},
+                      new int[4][] 
+                    { 
+                        new[] { 2,8,9,10},
+                        new[] { 0,8,16,17},
+                        new[] { 0,1,2,8},
+                        new[] { 1,2,10,18}
+
+                    },
+                    new []{"l3","l4","l1","l2"}
+                    )},
+                
+                {"l3", ()=>new BoardPiece(
+                    new []{2,8,9,10},
+                    new int[4][] 
+                    { 
+                        new[] { 0,8,16,17},
+                        new[] { 0,1,2,8},
+                        new[] { 1,2,10,18},
+                        new[] { 2,8,9,10},
+
+                    },
+                    new []{"l4","l1","l2","l3"}
+                    )},
+                    
+                 {"l4", ()=>new BoardPiece(
+                     new []{0,8,16,17},
+                     new int[4][] 
+                    { 
+                        new[] { 0,1,2,8},
+                        new[] { 1,2,10,18},
+                        new[] { 2,8,9,10},
+                        new[] { 0,8,16,17}
+                    },
+                     new []{"l1","l2","l3","l4"}
+                     )},
+
             {"o", ()=>new BoardPiece(new []{0,1,8,9}, null, null)},
 
 
 
-            //{"j1", ()=>new BoardPiece(new []{0,1,2,10})},
-            //{"j2", ()=>new BoardPiece(new []{2,10,17,18})},
-            //{"j3", ()=>new BoardPiece(new []{0,8,9,10})},
-            //{"j4", ()=>new BoardPiece(new []{0,1,8,16})},
             //{"l1", ()=>new BoardPiece(new []{0,1,2,8})},
             //{"l2", ()=>new BoardPiece(new []{1,2,10,18})},
             //{"l3", ()=>new BoardPiece(new []{2,8,9,10})},
