@@ -48,22 +48,42 @@ namespace Common
                 new []{"i1", "i2"}
                 )},
 
-               {"s1", ()=>new BoardPiece(
+               {"z1", ()=>new BoardPiece(
                 new []{0,1,9,10}, // Location
                 new int [2][]  // Rotation
                 { 
                     new[] { 1, 8, 9, 16},
                     new[] { 0, 1, 9, 10}
                 }, 
-                new []{"s2", "s1"}
+                new []{"z2", "z1"}
                 )},
 
-               {"s2", ()=>new BoardPiece(
+               {"z2", ()=>new BoardPiece(
                 new []{1,8,9,16}, // Location
                 new int [2][]  // Rotation
                 { 
                     new[] { 0, 1, 9, 10},
                     new[] { 1, 8, 9, 16}
+                }, 
+                new []{"z1", "z2"}
+                )},
+
+               {"s1", ()=>new BoardPiece(
+                new []{1,2,8,9}, // Location
+                new int [2][]  // Rotation
+                { 
+                    new[] { 0, 8, 9, 17},
+                    new[] { 1, 2, 8, 9}
+                }, 
+                new []{"s2", "s1"}
+                )},
+
+               {"s2", ()=>new BoardPiece(
+                new []{0, 8, 9, 17}, // Location
+                new int [2][]  // Rotation
+                { 
+                    new[] { 1, 2, 8, 9},
+                    new[] { 0, 8, 9, 17}
                 }, 
                 new []{"s1", "s2"}
                 )},
