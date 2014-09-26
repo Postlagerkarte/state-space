@@ -48,6 +48,26 @@ namespace Common
                 new []{"i1", "i2"}
                 )},
 
+               {"s1", ()=>new BoardPiece(
+                new []{0,1,9,10}, // Location
+                new int [2][]  // Rotation
+                { 
+                    new[] { 1, 8, 9, 16},
+                    new[] { 0, 1, 9, 10}
+                }, 
+                new []{"s2", "s1"}
+                )},
+
+               {"s2", ()=>new BoardPiece(
+                new []{1,8,9,16}, // Location
+                new int [2][]  // Rotation
+                { 
+                    new[] { 0, 1, 9, 10},
+                    new[] { 1, 8, 9, 16}
+                }, 
+                new []{"s1", "s2"}
+                )},
+
                 {"t1", ()=>new BoardPiece(
                     new []{8,9,10,17},
                     new int[4][] 
@@ -102,10 +122,7 @@ namespace Common
             {"o", ()=>new BoardPiece(new []{0,1,8,9}, null, null)},
 
 
-            //{"t1", ()=>new BoardPiece(new []{0,1,2,9})},
-            //{"t2", ()=>new BoardPiece(new []{1,8,9,10})},
-            //{"t3", ()=>new BoardPiece(new []{1,9,10,17})},
-            //{"t4", ()=>new BoardPiece(new []{1,8,9,17})},
+
             //{"j1", ()=>new BoardPiece(new []{0,1,2,10})},
             //{"j2", ()=>new BoardPiece(new []{2,10,17,18})},
             //{"j3", ()=>new BoardPiece(new []{0,8,9,10})},
