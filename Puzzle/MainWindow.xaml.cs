@@ -41,9 +41,10 @@ namespace Puzzle
         }
 
 
-        private void Button_Click(object sender, RoutedEventArgs e)
+        private async void Button_ClickCreateBoard(object sender, RoutedEventArgs e)
         {
-            this.currentBoard = lg.CreateBoard();
+            var progress = new Progress<long>((i) => this.txtBoardCreationProgress.Text = i.ToString());
+            this.currentBoard = await Task.Run(() => lg.CreateBoard(progress));
             this.boardViewModel = lg.CreateViewModelWithTextures(currentBoard);
             this.Setup(boardViewModel);
         }
@@ -140,6 +141,8 @@ namespace Puzzle
 
         private async void Button_ClickSolve(object sender, RoutedEventArgs e)
         {
+            this.txtInfo.Text = string.Empty;
+            this.stackPanelMovesNeeded.Visibility = System.Windows.Visibility.Collapsed;
 
             var progress = new Progress<Tuple<long,long>>(i =>
             {
@@ -149,14 +152,23 @@ namespace Puzzle
 
             var solved = await Task.Run(()=> this.lg.Solve(this.currentBoard, progress));
 
-
-            // Reverse the solved->start parent chain
-            Debug.Assert(null != solved);
-            solution = new Stack<Board>();
-            while (null != solved)
+            if (solved == null) //no solution or stoprequested
             {
-                solution.Push(solved);
-                solved = solved.Parent;
+                this.txtInfo.Text = "No solution found or stop requested!";
+            }
+            else
+            {
+                // Reverse the solved->start parent chain
+                solution = new Stack<Board>();
+                while (null != solved)
+                {
+                    solution.Push(solved);
+                    solved = solved.Parent;
+                }
+
+                this.stackPanelMovesNeeded.Visibility = System.Windows.Visibility.Visible;
+                this.txtInfo.Text = "*** SOLUTION FOUND ***";
+                this.txtMovesNeeded.Text = solution.Count().ToString();
             }
 
         }
@@ -165,10 +177,18 @@ namespace Puzzle
 
         private void Button_ClickShowSolution(object sender, RoutedEventArgs e)
         {
-             var board = solution.Pop();
-            var bvm = new BoardViewModel(board.Pieces[0], board.Pieces.Skip(1).ToList());
-            this.Setup(bvm);
-            this.boardViewModel = bvm;
+            if (solution.Count > 0)
+            {
+                var board = solution.Pop();
+                var bvm = new BoardViewModel(board.Pieces[0], board.Pieces.Skip(1).ToList());
+                this.Setup(bvm);
+                this.boardViewModel = bvm;
+            }
+        }
+
+        private void Button_ClickStop(object sender, RoutedEventArgs e)
+        {
+            lg.StopSolving();
         }
     }
 

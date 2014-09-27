@@ -13,6 +13,7 @@ namespace LevelGenerator
         private List<int[]> boardLocationHashStrings = new List<int[]>();
         private List<int> possibleIndexLocations;
         private Random r = new Random();
+        private bool stopRequest;
 
 
         
@@ -32,21 +33,24 @@ namespace LevelGenerator
 
         }
 
-        public Board CreateBoard()
+        public Board CreateBoard(Progress<long> progress)
         {
-            var layout = new List<string>() { "o", "l1", "l2", "l3", "l4"};
-            //for (int x = 0; x < 5; x++)
-            //{
-                //layout.Add(Board.KnownPieces.ElementAt(r.Next(Board.KnownPieces.Count())).Key);
-            //}
-            var board = CreateValidBoard(layout.ToArray());
+            var layout = new List<string>() { "o" };
+            for (int x = 0; x < 6; x++)
+            {
+                layout.Add(Helper.KnownPieces.ElementAt(r.Next(Helper.KnownPieces.Count())).Key);
+            }
+            var board = CreateValidBoard(layout.ToArray(), progress);
             return board; 
         }
 
-        public Board CreateValidBoard(string[] layout)
+        public Board CreateValidBoard(string[] layout, IProgress<long> progress)
         {
+            long counter = 0;
             Board board = new Board(layout);
             tryAgain:
+            counter++;
+            if(counter % 100 == 0) progress.Report(counter);
             var locations = CreateUnseenLocationArray(layout.Length);
             if (!board.SetUpBoard(locations)) goto tryAgain;
 
@@ -65,6 +69,7 @@ namespace LevelGenerator
         public Board Solve(Board input, IProgress<Tuple<long,long>> progress)
         {
             Dictionary<int, int> hashSet = new Dictionary<int, int>();
+            this.stopRequest = false;
             var start = input;
 
             Board solved = null;
@@ -75,7 +80,7 @@ namespace LevelGenerator
 
             long explored = 0;
             // Keep going as long as there are unseen states...
-            while (0 < todo.Count)
+            while (0 < todo.Count && !stopRequest)
             {
 
 
@@ -145,5 +150,10 @@ namespace LevelGenerator
             return hash;
         }
 
+
+        public void StopSolving()
+        {
+            this.stopRequest = true;
+        }
     }
 }

@@ -18,18 +18,37 @@
             </Grid>
         </Viewbox>
         <StackPanel Grid.Row="1">
-        <Button Click="Button_Click">Next</Button>
+        <Button Click="Button_ClickCreateBoard">Next</Button>
         <Button Click="Button_ClickSolve">Solve</Button>
+        <Button Click="Button_ClickStop">Stop Trying</Button>
         <Button Click="Button_ClickShowSolution">Show Solution</Button>
-        <StackPanel Orientation="Horizontal">
-            <TextBlock>Boards left:</TextBlock>
-            <TextBlock x:Name="txtBoardsLeft"></TextBlock>
-        </StackPanel>
-
             <StackPanel Orientation="Horizontal">
-                <TextBlock>Boards explored:</TextBlock>
-                <TextBlock x:Name="txtBoardsExplored"></TextBlock>
+                <TextBlock>Trying to create board... :</TextBlock>
+                <TextBlock x:Name="txtBoardCreationProgress"></TextBlock>
             </StackPanel>
+            <GroupBox Header="Solving">
+                <StackPanel>
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock>Boards left:</TextBlock>
+                        <TextBlock x:Name="txtBoardsLeft"></TextBlock>
+                    </StackPanel>
+
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock>Boards explored:</TextBlock>
+                        <TextBlock x:Name="txtBoardsExplored"></TextBlock>
+                    </StackPanel>
+                </StackPanel>
+
+            </GroupBox>
+                       
+
+
+            <StackPanel x:Name="stackPanelMovesNeeded" Orientation="Horizontal">
+                <TextBlock>Moves required:</TextBlock>
+                <TextBlock x:Name="txtMovesNeeded"></TextBlock>
+            </StackPanel>
+
+            <TextBlock x:Name="txtInfo" Foreground="Red" Text="Info Text"></TextBlock>
         </StackPanel>
     </Grid>
 </Window>
