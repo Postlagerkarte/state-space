@@ -26,6 +26,7 @@ namespace Puzzle
         private BoardViewModel boardViewModel;
         private LevelGeneratorService lg = new LevelGeneratorService();
         private Board currentBoard;
+        private int[] cachedLocations;
 
         public MainWindow()
         {
@@ -43,10 +44,29 @@ namespace Puzzle
 
         private async void Button_ClickCreateBoard(object sender, RoutedEventArgs e)
         {
+            await CreateBoard();
+        }
+
+        private async Task CreateBoard()
+        {
+            this.ClearText();
+
+            var numberOfPieces = (int)pieceSlider.Value;
             var progress = new Progress<long>((i) => this.txtBoardCreationProgress.Text = i.ToString());
-            this.currentBoard = await Task.Run(() => lg.CreateBoard(progress));
+            this.currentBoard = await Task.Run(() => lg.CreateBoard(numberOfPieces, progress));
+            this.cachedLocations = this.currentBoard.Locations;
             this.boardViewModel = lg.CreateViewModelWithTextures(currentBoard);
+
             this.Setup(boardViewModel);
+        }
+
+        private void ClearText()
+        {
+            this.txtBoardCreationProgress.Text = string.Empty;
+            this.txtBoardsExplored.Text = string.Empty;
+            this.txtBoardsLeft.Text = string.Empty;
+            this.txtInfo.Text = string.Empty;
+            this.txtMovesNeeded.Text = string.Empty;
         }
 
         private void Setup(BoardViewModel boardViewModel)
@@ -141,16 +161,22 @@ namespace Puzzle
 
         private async void Button_ClickSolve(object sender, RoutedEventArgs e)
         {
+            await SolveBoard();
+
+        }
+
+        private async Task SolveBoard()
+        {
             this.txtInfo.Text = string.Empty;
             this.stackPanelMovesNeeded.Visibility = System.Windows.Visibility.Collapsed;
 
-            var progress = new Progress<Tuple<long,long>>(i =>
+            var progress = new Progress<Tuple<long, long>>(i =>
             {
                 this.txtBoardsLeft.Text = i.Item1.ToString();
                 this.txtBoardsExplored.Text = i.Item2.ToString();
             });
 
-            var solved = await Task.Run(()=> this.lg.Solve(this.currentBoard, progress));
+            var solved = await Task.Run(() => this.lg.Solve(new Board(this.currentBoard, this.cachedLocations), progress));
 
             if (solved == null) //no solution or stoprequested
             {
@@ -167,22 +193,26 @@ namespace Puzzle
                 }
 
                 this.stackPanelMovesNeeded.Visibility = System.Windows.Visibility.Visible;
-                this.txtInfo.Text = "*** SOLUTION FOUND ***";
+                this.txtInfo.Text = "Solution has been found.";
                 this.txtMovesNeeded.Text = solution.Count().ToString();
             }
-
         }
 
         private Stack<Board> solution;
 
         private void Button_ClickShowSolution(object sender, RoutedEventArgs e)
         {
+            this.ShowSolution();
+        }
+
+        private void ShowSolution()
+        {
             if (solution.Count > 0)
             {
                 var board = solution.Pop();
                 var bvm = new BoardViewModel(board.Pieces[0], board.Pieces.Skip(1).ToList());
-                this.Setup(bvm);
                 this.boardViewModel = bvm;
+                this.Setup(bvm);
             }
         }
 

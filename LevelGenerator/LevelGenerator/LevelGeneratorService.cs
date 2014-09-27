@@ -33,14 +33,18 @@ namespace LevelGenerator
 
         }
 
-        public Board CreateBoard(Progress<long> progress)
+        public Board CreateBoard(int numberOfPieces, Progress<long> progress)
         {
+            this.hashSet.Clear();
+
             var layout = new List<string>() { "o" };
-            for (int x = 0; x < 6; x++)
+            for (int x = 0; x < numberOfPieces; x++)
             {
                 layout.Add(Helper.KnownPieces.ElementAt(r.Next(Helper.KnownPieces.Count())).Key);
             }
+
             var board = CreateValidBoard(layout.ToArray(), progress);
+            
             return board; 
         }
 

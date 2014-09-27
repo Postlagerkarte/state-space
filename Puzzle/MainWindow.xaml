@@ -2,8 +2,15 @@
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="MainWindow"
-        Width="525"
-        Height="350">
+        Width="800"
+        Height="800">
+    <Window.Resources>
+        <Style TargetType="Button">
+            <Setter Property="Width" Value="100"/>
+            <Setter Property="HorizontalAlignment" Value="Left"/>
+            <Setter Property="Margin" Value="0 8 0 0"/>
+        </Style>
+    </Window.Resources>
     <Grid>
         <Grid.RowDefinitions>
             <RowDefinition></RowDefinition>
@@ -18,37 +25,49 @@
             </Grid>
         </Viewbox>
         <StackPanel Grid.Row="1">
-        <Button Click="Button_ClickCreateBoard">Next</Button>
-        <Button Click="Button_ClickSolve">Solve</Button>
-        <Button Click="Button_ClickStop">Stop Trying</Button>
-        <Button Click="Button_ClickShowSolution">Show Solution</Button>
-            <StackPanel Orientation="Horizontal">
-                <TextBlock>Trying to create board... :</TextBlock>
-                <TextBlock x:Name="txtBoardCreationProgress"></TextBlock>
-            </StackPanel>
-            <GroupBox Header="Solving">
+
+            <GroupBox Margin="0 8 0 0" Header="Board Setup">
                 <StackPanel>
                     <StackPanel Orientation="Horizontal">
+                        <Slider x:Name="pieceSlider" Width="100" HorizontalAlignment="Left" Minimum="0" Maximum="6"  TickFrequency="1" IsSnapToTickEnabled="True" TickPlacement="TopLeft"></Slider>
+                        <TextBlock Margin="8 0 0 0" Text="{Binding ElementName=pieceSlider, Path=Value}"   VerticalAlignment="Bottom" ></TextBlock>
+                       <TextBlock VerticalAlignment="Bottom" Text=" Pieces"></TextBlock>
+                    </StackPanel>
+                    <Button Click="Button_ClickCreateBoard">Create Board</Button>
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock>Trying to create board... :</TextBlock>
+                        <TextBlock x:Name="txtBoardCreationProgress"></TextBlock>
+                    </StackPanel>
+                </StackPanel>
+            </GroupBox>
+
+  
+            <GroupBox Margin="0 8 0 0" Header="Solving">
+                <StackPanel>
+                    <Button Click="Button_ClickSolve">Solve</Button>
+                    <Button Click="Button_ClickStop">Stop Solving</Button>
+                    <StackPanel Margin="0 8 0 0" Orientation="Horizontal">
                         <TextBlock>Boards left:</TextBlock>
                         <TextBlock x:Name="txtBoardsLeft"></TextBlock>
                     </StackPanel>
 
-                    <StackPanel Orientation="Horizontal">
+                    <StackPanel Margin="0 8 0 0" Orientation="Horizontal">
                         <TextBlock>Boards explored:</TextBlock>
                         <TextBlock x:Name="txtBoardsExplored"></TextBlock>
                     </StackPanel>
                 </StackPanel>
-
             </GroupBox>
-                       
 
-
-            <StackPanel x:Name="stackPanelMovesNeeded" Orientation="Horizontal">
-                <TextBlock>Moves required:</TextBlock>
-                <TextBlock x:Name="txtMovesNeeded"></TextBlock>
-            </StackPanel>
-
-            <TextBlock x:Name="txtInfo" Foreground="Red" Text="Info Text"></TextBlock>
+            <GroupBox Margin="0 8 0 0" Header="Solution">
+                <StackPanel>
+                    <Button Click="Button_ClickShowSolution">Show Solution</Button>
+                    <StackPanel x:Name="stackPanelMovesNeeded" Orientation="Horizontal">
+                        <TextBlock>Moves required:</TextBlock>
+                        <TextBlock x:Name="txtMovesNeeded"></TextBlock>
+                    </StackPanel>
+                </StackPanel>
+            </GroupBox>
+            <TextBlock Margin="0 8 0 0" x:Name="txtInfo" Foreground="Red" Text="Info Text"></TextBlock>
         </StackPanel>
     </Grid>
 </Window>

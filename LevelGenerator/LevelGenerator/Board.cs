@@ -11,15 +11,23 @@ namespace LevelGenerator
 
     public class Board 
     {
-        
+
+        private bool supportsRotation;
+
         private static int[] deltas = new[] { -1, 1, 8, -8 };
 
         private string[] layout;
 
         private int[] locations;
 
+        public int[] Locations
+        {
+            get { return locations; }
+            set { locations = value; }
+        }
+
         public BoardPiece[] Pieces;
-        private Board board;
+
 
         public bool SetUpBoard(int[] locations)
         {
@@ -38,6 +46,8 @@ namespace LevelGenerator
 
         public Board Parent { get; private set; }
 
+
+        public Board(Board parent) : this(parent, parent.locations) { }
   
         public Board(string[] layout)
         {
@@ -59,9 +69,12 @@ namespace LevelGenerator
         }
 
         // Create a board from its parent
-        private Board(Board parent, int[] locations, int i = -1, string pieceName = "")
+        // if board is coming from a rotation, we need to create a new piece and not only copy pieces
+        public Board(Board parent, int[] locations, int i = -1, string pieceName = "")
         {
             Parent = parent;
+
+            this.supportsRotation = parent.supportsRotation;
 
             this.Pieces = new BoardPiece[parent.Pieces.Count()];
 
@@ -103,17 +116,20 @@ namespace LevelGenerator
                     }
 
                 }
-                
 
-                if (this.Pieces[i].Transformations != null)
+                if (this.supportsRotation)
                 {
-                    //... and each rotation
-                    foreach (var newPiece in this.Pieces[i].Transformations)
+
+                    if (this.Pieces[i].Transformations != null)
                     {
-                        var board2 = new Board(this, (int[])this.locations.Clone(), i, newPiece);
-                        if (board2.IsValid)
+                        //... and each rotation
+                        foreach (var newPiece in this.Pieces[i].Transformations)
                         {
-                             yield return board2;
+                            var board2 = new Board(this, (int[])this.locations.Clone(), i, newPiece);
+                            if (board2.IsValid)
+                            {
+                                yield return board2;
+                            }
                         }
                     }
                 }
