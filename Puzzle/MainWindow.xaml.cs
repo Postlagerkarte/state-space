@@ -27,6 +27,10 @@ namespace Puzzle
         private LevelGeneratorService lg = new LevelGeneratorService();
         private Board currentBoard;
         private int[] cachedLocations;
+        private bool allowRotation;
+
+        private Stack<Board> cachedSolution; //So that we can reset and show the solution again
+        private Stack<Board> solution; //used to popup each moves and display it to the user
 
         public MainWindow()
         {
@@ -101,7 +105,7 @@ namespace Puzzle
                     this.currentClickPosition = currentClickPosition; //store current click position                  
                 }
             }
-            else if (clickType == ClickType.DoubleClick)
+            else if (clickType == ClickType.DoubleClick && this.allowRotation)
             {
                 this.boardViewModel.Rotate(currentClickPosition);    
             }   
@@ -192,24 +196,49 @@ namespace Puzzle
                     solved = solved.Parent;
                 }
 
+                //popup first element it is a duplicate (!find the reason, seems to be a bug?)
+                solution.Pop();
+
+                //prepare cache
+                this.cachedSolution = new Stack<Board>();
+
                 this.stackPanelMovesNeeded.Visibility = System.Windows.Visibility.Visible;
                 this.txtInfo.Text = "Solution has been found.";
                 this.txtMovesNeeded.Text = solution.Count().ToString();
             }
         }
 
-        private Stack<Board> solution;
+
 
         private void Button_ClickShowSolution(object sender, RoutedEventArgs e)
         {
             this.ShowSolution();
         }
 
+        private void Button_ClickResetSoltion(object sender, RoutedEventArgs e)
+        {
+            while(this.solution.Count > 0)
+            {
+                this.cachedSolution.Push(this.solution.Pop());
+            }
+
+            this.solution = new Stack<Board>();
+
+            while(this.cachedSolution.Count > 0)
+            {
+                this.solution.Push(this.cachedSolution.Pop());
+            }
+
+            this.ShowSolution();
+        }
+
         private void ShowSolution()
         {
-            if (solution.Count > 0)
+            if (this.solution.Count > 0)
             {
                 var board = solution.Pop();
+                //cache the solution so that we can play it again
+                this.cachedSolution.Push(board);
                 var bvm = new BoardViewModel(board.Pieces[0], board.Pieces.Skip(1).ToList());
                 this.boardViewModel = bvm;
                 this.Setup(bvm);
@@ -220,6 +249,18 @@ namespace Puzzle
         {
             lg.StopSolving();
         }
+
+        private void CheckBox_Checked(object sender, RoutedEventArgs e)
+        {
+            this.allowRotation = true;
+        }
+
+        private void CheckBox_Unchecked(object sender, RoutedEventArgs e)
+        {
+            this.allowRotation = false;
+        }
+
+
     }
 
     public enum ClickType

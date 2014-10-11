@@ -32,6 +32,7 @@
                         <Slider x:Name="pieceSlider" Width="100" HorizontalAlignment="Left" Minimum="0" Maximum="6"  TickFrequency="1" IsSnapToTickEnabled="True" TickPlacement="TopLeft"></Slider>
                         <TextBlock Margin="8 0 0 0" Text="{Binding ElementName=pieceSlider, Path=Value}"   VerticalAlignment="Bottom" ></TextBlock>
                        <TextBlock VerticalAlignment="Bottom" Text=" Pieces"></TextBlock>
+                       <CheckBox VerticalAlignment="Bottom" Margin="8 0 0 0" Checked="CheckBox_Checked" Unchecked="CheckBox_Unchecked">Allow Rotation</CheckBox>
                     </StackPanel>
                     <Button Click="Button_ClickCreateBoard">Create Board</Button>
                     <StackPanel Orientation="Horizontal">
@@ -61,6 +62,7 @@
             <GroupBox Margin="0 8 0 0" Header="Solution">
                 <StackPanel>
                     <Button Click="Button_ClickShowSolution">Show Solution</Button>
+                    <Button Click="Button_ClickResetSoltion">Reset Solution</Button>
                     <StackPanel x:Name="stackPanelMovesNeeded" Orientation="Horizontal">
                         <TextBlock>Moves required:</TextBlock>
                         <TextBlock x:Name="txtMovesNeeded"></TextBlock>

@@ -46,6 +46,10 @@ namespace LevelGenerator
 
         public Board Parent { get; private set; }
 
+        public Board()
+        {
+
+        }
 
         public Board(Board parent) : this(parent, parent.locations) { }
   
