@@ -11,22 +11,27 @@ npm run build    # static site in dist/ (deployable to GitHub Pages etc.)
 npm run mine     # offline level mining (generate-and-test + BFS validation)
 ```
 
-## The three tabs
+## The four tabs
 
-- **Play** — solve the puzzle by hand. Click a piece, slide with arrow keys or
-  the on-screen pad, bring the gold 2×2 block to the glowing corner. A
-  background BFS computes the optimal move count so students can compare.
-- **Watch** — breadth-first search visualized live. Every board state the
-  solver discovers becomes a glowing node (depth = distance from center);
-  cyan = frontier, indigo = explored, red flash = duplicate pruned by the hash
-  set, gold = solution path. Pseudocode and counters update as it runs; click
-  any node to see the board state it represents. Step mode for lectures.
-- **Race** — BFS, DFS and A* explore the *same* level side by side with the
-  same expansion budget. Try the "Heuristic's Delight" level: BFS wades through
-  ~26k states, A* needs ~3k for the same optimal answer, and DFS finds a fast
-  but absurdly long solution.
+- **⚡ Rush** (default) — an endless arcade run on generated "glide" boards
+  (pieces slide until they hit something; park the gold block exactly on the
+  pad). A global time bank drains; solves refund time; at-par streaks build a
+  combo multiplier that earns boosters (bomb, freeze). The generator + BFS
+  solver mine difficulty-calibrated boards live during play.
+- **🧘 Zen** — the curated campaign with stars, undo and hints. Landing
+  previews (ghosts of every spot a piece can glide to) appear after a moment
+  of inactivity; stuck longer, and the solver shimmers the optimal landings.
+- **Watch** — the game's own breadth-first search, visualized live on the same
+  glide boards. Every node is one board position, colored by search depth so
+  BFS reads as expanding waves; a white cursor marks the position being
+  expanded; red flashes are duplicates pruned by the seen-set. Click any node
+  to see its board. Step mode for lectures.
+- **Race** — BFS, DFS and A* explore the same level side by side (the classic
+  2014 sliding rules, whose bigger state space makes the differences vivid).
+  Try "Heuristic's Delight": BFS wades through ~26k states, A* needs ~3k.
 
-Deep links for the classroom: `?tab=watch&run=1`, `?tab=race&run=1`.
+Deep links for the classroom: `?tab=watch&run=1`, `?tab=race&run=1`,
+`?tab=play` (Zen). Debug: `?bank=N` sets the Rush starting clock.
 
 ## Where things live
 

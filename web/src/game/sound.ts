@@ -148,43 +148,29 @@ export function swishBack(): void {
   src.stop(t + 0.25);
 }
 
-// Major pentatonic over two octaves: any sequence of these sounds musical,
-// which is the point — optimal play should literally be a melody.
-const PENTATONIC = [0, 2, 4, 7, 9, 12, 14, 16, 19, 21, 24];
-const MELODY_ROOT = 293.66; // D4
-
-// Rush mode shifts the whole melody up a key per combo level — heat = pitch.
-let melodyKeySemis = 0;
-
-export function setMelodyKey(semitones: number): void {
-  melodyKeySemis = semitones;
-}
-
 /**
- * One step of the progress melody. `step` is how close the hero is to the goal
- * (1 = first step of progress, par = the final note before the win resolves).
+ * One soft bright chime for a *great* move (on the optimal path AND a long,
+ * dramatic glide). Rare on purpose: playtesting showed per-move pitch ladders
+ * get annoying — scarcity is what keeps a reward sound rewarding.
  */
-export function melodyNote(step: number): void {
+export function shing(): void {
   const c = ensure();
   if (!c) return;
-  const idx = Math.min(PENTATONIC.length - 1, Math.max(0, step - 1));
-  const freq = MELODY_ROOT * Math.pow(2, (PENTATONIC[idx] + melodyKeySemis) / 12);
   const t = c.currentTime;
-  const voices: ReadonlyArray<readonly [number, number]> = [
-    [1, 0.2], // fundamental
-    [2, 0.05], // octave shimmer
-  ];
-  for (const [mult, peak] of voices) {
+  for (const [mult, peak] of [
+    [1, 0.12],
+    [2.01, 0.04],
+  ] as const) {
     const osc = c.createOscillator();
-    osc.type = 'triangle';
-    osc.frequency.value = freq * mult;
+    osc.type = 'sine';
+    osc.frequency.value = 1318.5 * mult; // E6 + shimmer
     const gain = c.createGain();
     gain.gain.setValueAtTime(0.001, t);
-    gain.gain.exponentialRampToValueAtTime(peak, t + 0.015);
-    gain.gain.exponentialRampToValueAtTime(0.001, t + 0.5);
+    gain.gain.exponentialRampToValueAtTime(peak, t + 0.012);
+    gain.gain.exponentialRampToValueAtTime(0.001, t + 0.6);
     osc.connect(gain).connect(c.destination);
     osc.start(t);
-    osc.stop(t + 0.55);
+    osc.stop(t + 0.65);
   }
 }
 

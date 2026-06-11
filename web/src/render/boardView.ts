@@ -715,6 +715,19 @@ export class BoardView {
     this.clearPreviews();
   }
 
+  /** A small golden glint on a piece — the rare "great move" reward. */
+  sparklePiece(pieceIdx: number): void {
+    if (!this.state || pieceIdx >= this.state.length) return;
+    const cells = this.layout.cells(this.state[pieceIdx]);
+    let cx = 0;
+    let cz = 0;
+    for (const cell of cells) {
+      cx += this.cellX(cell);
+      cz += this.cellZ(cell);
+    }
+    this.spawnFirework(cx / cells.length, cz / cells.length, 26, 2.6, 0.65);
+  }
+
   /** Pulse all blockers as bomb targets (hero excluded). */
   setTargeting(on: boolean): void {
     this.targeting = on;

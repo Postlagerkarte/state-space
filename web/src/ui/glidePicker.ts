@@ -49,7 +49,7 @@ export class GlidePicker {
   private status: HTMLElement;
   private search: GlideLevelSearch | null = null;
 
-  constructor() {
+  constructor(opts: { defaultId?: string } = {}) {
     this.root = el(`
       <div class="level-picker">
         <label class="field"><span>Level</span><select data-level></select></label>
@@ -67,6 +67,9 @@ export class GlidePicker {
     this.status = this.root.querySelector('[data-status]')!;
 
     this.refresh();
+    if (opts.defaultId && GLIDE_LEVELS.some((l) => l.id === opts.defaultId)) {
+      this.select.value = opts.defaultId;
+    }
     this.select.addEventListener('change', () => this.load());
     this.blockersInput.addEventListener('input', () => {
       this.blockersVal.textContent = this.blockersInput.value;

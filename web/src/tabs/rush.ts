@@ -89,7 +89,7 @@ export function createRushTab(): TabController {
             <h2>⚡ Rush</h2>
             <p>Endless boards, one draining clock.<br/>
             Solving refunds time — harder boards refund more.<br/>
-            Stay at par to build your combo: the music climbs with you.</p>
+            Stay at par to build your combo — milestones earn boosters.</p>
             <p class="rush-best" data-best-line></p>
             <div class="btnrow center">
               <button class="btn primary big" data-start-btn>▶ &nbsp;START RUN</button>
@@ -154,10 +154,10 @@ export function createRushTab(): TabController {
   let search: GlideLevelSearch | null = null;
   let searchFor = -1;
 
-  // melody / dead-end detection
+  // dead-end detection + great-move reward
   let distSolver: Solver<GState, GMove> | null = null;
   let prevDist: number | null = null;
-  let baseDist = 0;
+  let lastMove: { pieceIdx: number; dist: number } | null = null;
 
   // boosters
   let boosters: Booster[] = [];
@@ -304,8 +304,8 @@ export function createRushTab(): TabController {
     level = lvl;
     current = gCloneState(lvl.state);
     movesThisBoard = 0;
-    baseDist = lvl.optimal;
     prevDist = lvl.optimal;
+    lastMove = null;
     distSolver = null;
     selected = -1;
     hoverIdx = -1;
@@ -366,7 +366,6 @@ export function createRushTab(): TabController {
     const bankParam = Number(new URLSearchParams(location.search).get('bank'));
     bank = Number.isFinite(bankParam) && bankParam > 0 ? bankParam : BANK_START;
     lastTickSecond = -1;
-    sound.setMelodyKey(0);
     startOverlay.hidden = true;
     deathOverlay.hidden = true;
     hud.hidden = false;
@@ -385,7 +384,6 @@ export function createRushTab(): TabController {
   function die(): void {
     phase = 'dead';
     sound.gameOver();
-    sound.setMelodyKey(0);
     cancelBombTargeting();
     board?.clearPreviews();
     const best = loadBest();
@@ -420,13 +418,11 @@ export function createRushTab(): TabController {
     const atPar = movesThisBoard <= par;
     const isClutch = bank < CLUTCH_WINDOW;
 
-    window.setTimeout(() => sound.melodyNote(baseDist), Math.max(0, dur * 1000 - 10));
     window.setTimeout(() => board?.celebrate('quick'), dur * 1000 + 60);
 
     if (atPar) {
       combo++;
       maxCombo = Math.max(maxCombo, combo);
-      sound.setMelodyKey(2 * Math.min(combo - 1, 6));
       window.setTimeout(() => sound.comboUp(combo), dur * 1000 + 180);
       // combo milestones pay out a booster: protecting the streak pays twice
       if (combo >= 3 && combo % 2 === 1) {
@@ -434,7 +430,6 @@ export function createRushTab(): TabController {
       }
     } else if (combo > 1) {
       combo = 1;
-      sound.setMelodyKey(0);
       sound.comboBreak();
       popup('combo lost', 'muted');
     }
@@ -471,7 +466,6 @@ export function createRushTab(): TabController {
     }
     if (combo > 1) {
       combo = 1;
-      sound.setMelodyKey(0);
       sound.comboBreak();
     }
     updateHud();
@@ -491,10 +485,19 @@ export function createRushTab(): TabController {
       prevDist = null;
       return;
     }
-    if (prevDist !== null && d < prevDist && phase === 'running') {
-      const note = Math.max(1, baseDist - d);
-      const delay = Math.max(0, impactAt - performance.now() + 90);
-      window.setTimeout(() => sound.melodyNote(note), delay);
+    if (
+      prevDist !== null &&
+      d < prevDist &&
+      phase === 'running' &&
+      lastMove &&
+      lastMove.dist >= 4
+    ) {
+      const move = lastMove;
+      const delay = Math.max(0, impactAt - performance.now() + 60);
+      window.setTimeout(() => {
+        board?.sparklePiece(move.pieceIdx);
+        sound.shing();
+      }, delay);
     }
     prevDist = d;
   }
@@ -639,6 +642,7 @@ export function createRushTab(): TabController {
     current = slid.state;
     movesThisBoard++;
     lastMoveAt = performance.now();
+    lastMove = { pieceIdx, dist: slid.dist };
     cancelBombTargeting();
     assist = null;
     const dur = board.applyState(current);
@@ -804,7 +808,6 @@ export function createRushTab(): TabController {
     deactivate() {
       window.removeEventListener('keydown', onKey);
       cancelAnimationFrame(raf);
-      sound.setMelodyKey(0);
     },
   };
 }

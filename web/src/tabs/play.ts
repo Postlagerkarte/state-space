@@ -90,14 +90,13 @@ export function createPlayTab(): TabController {
   let hintsUsed = false;
   let solvedShown = false;
 
-  // The melody mechanic: after each move a background BFS recomputes the true
-  // distance to the goal. Moves that bring the hero closer play the next note
-  // of an ascending pentatonic ladder — optimal play is literally a tune.
-  // The same solver result powers the "this position is dead" toast.
+  // After each move a background BFS recomputes the true distance to the goal.
+  // It powers the "this position is dead" toast and the rare great-move reward
+  // (a move on the optimal path that was also a long, dramatic glide).
   let distSolver: Solver<GState, GMove> | null = null;
   let prevDist: number | null = null;
-  let baseDist = 0;
-  let impactAt = 0; // wall-clock ms when the current glide lands (for note timing)
+  let impactAt = 0; // wall-clock ms when the current glide lands (for effect timing)
+  let lastMove: { pieceIdx: number; dist: number } | null = null;
 
   function startDistCheck(): void {
     if (!level) return;
@@ -111,10 +110,13 @@ export function createPlayTab(): TabController {
       return;
     }
     toast.hidden = true;
-    if (prevDist !== null && d < prevDist && !solvedShown) {
-      const note = Math.max(1, baseDist - d);
-      const delay = Math.max(0, impactAt - performance.now() + 90);
-      setTimeout(() => sound.melodyNote(note), delay);
+    if (prevDist !== null && d < prevDist && !solvedShown && lastMove && lastMove.dist >= 4) {
+      const move = lastMove;
+      const delay = Math.max(0, impactAt - performance.now() + 60);
+      setTimeout(() => {
+        board?.sparklePiece(move.pieceIdx);
+        sound.shing();
+      }, delay);
     }
     prevDist = d;
   }
@@ -286,7 +288,7 @@ export function createPlayTab(): TabController {
     overlay.hidden = true;
     toast.hidden = true;
     distSolver = null;
-    baseDist = lvl.optimal;
+    lastMove = null;
     prevDist = lvl.optimal;
     board.setLevel(current);
     parEl.textContent = String(lvl.optimal);
@@ -304,6 +306,7 @@ export function createPlayTab(): TabController {
     current = slid.state;
     history.push(gCloneState(current));
     lastMoveAt = performance.now();
+    lastMove = { pieceIdx, dist: slid.dist };
     board.clearHintRun();
     toast.hidden = true;
     const dur = board.applyState(current);
@@ -318,8 +321,6 @@ export function createPlayTab(): TabController {
       solvedShown = true;
       distSolver = null;
       board.clearPreviews();
-      // the melody's top note lands with the final impact, then resolves
-      setTimeout(() => sound.melodyNote(baseDist), Math.max(0, dur * 1000 - 10));
       setTimeout(() => {
         bv.celebrate();
         sound.winJingle();

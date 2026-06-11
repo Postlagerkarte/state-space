@@ -47,7 +47,11 @@ export class GraphView {
   private positions: Float32Array;
   private dirs: Float32Array;
   private kinds: Uint8Array;
+  private depths: Uint16Array;
   private count = 0;
+  private cursorId = -1;
+  /** Color explored nodes by their BFS depth: the search reads as growing waves. */
+  depthWaves = false;
 
   private edgeGeo = new THREE.BufferGeometry();
   private edgePos: Float32Array;
@@ -62,6 +66,7 @@ export class GraphView {
 
   private dummy = new THREE.Matrix4();
   private tmpColor = new THREE.Color();
+  private waveColor = new THREE.Color();
 
   constructor(
     private container: HTMLElement,
@@ -104,6 +109,7 @@ export class GraphView {
     this.positions = new Float32Array(this.capacity * 3);
     this.dirs = new Float32Array(this.capacity * 3);
     this.kinds = new Uint8Array(this.capacity);
+    this.depths = new Uint16Array(this.capacity);
 
     this.edgePos = new Float32Array(this.capacity * 6);
     this.edgeGeo.setAttribute('position', new THREE.BufferAttribute(this.edgePos, 3));
@@ -176,6 +182,7 @@ export class GraphView {
     this.positions[id * 3 + 1] = y;
     this.positions[id * 3 + 2] = z;
     this.kinds[id] = KIND_FRONTIER;
+    this.depths[id] = Math.min(depth, 0xffff);
 
     this.dummy.makeScale(0.01, 0.01, 0.01);
     this.dummy.setPosition(x, y, z);
@@ -202,6 +209,15 @@ export class GraphView {
     if (this.mesh.instanceColor) this.mesh.instanceColor.needsUpdate = true;
   }
 
+  /** The display color for a node, honoring depth-wave mode for explored nodes. */
+  private colorFor(id: number): THREE.Color {
+    const kind = this.kinds[id];
+    if (kind === KIND_EXPLORED && this.depthWaves) {
+      return this.waveColor.setHSL((0.62 + this.depths[id] * 0.024) % 1, 0.65, 0.42);
+    }
+    return KIND_COLORS[kind];
+  }
+
   setKind(id: number, kind: number): void {
     if (id >= this.count) return;
     // never downgrade goal/path markings
@@ -209,7 +225,7 @@ export class GraphView {
       return;
     }
     this.kinds[id] = kind;
-    this.mesh.setColorAt(id, KIND_COLORS[kind]);
+    this.mesh.setColorAt(id, this.colorFor(id));
     const s = KIND_SCALES[kind];
     this.dummy.makeScale(s, s, s);
     this.dummy.setPosition(
@@ -224,6 +240,27 @@ export class GraphView {
 
   markExpanded(id: number): void {
     this.setKind(id, KIND_EXPLORED);
+  }
+
+  /** Highlight the node currently being expanded (pulses bright white). */
+  setCursor(id: number): void {
+    if (id === this.cursorId) return;
+    // restore the previous cursor node to its regular size
+    if (this.cursorId >= 0 && this.cursorId < this.count) {
+      const prev = this.cursorId;
+      const s = KIND_SCALES[this.kinds[prev]];
+      this.dummy.makeScale(s, s, s);
+      this.dummy.setPosition(
+        this.positions[prev * 3],
+        this.positions[prev * 3 + 1],
+        this.positions[prev * 3 + 2],
+      );
+      this.mesh.setMatrixAt(prev, this.dummy);
+      this.mesh.setColorAt(prev, this.colorFor(prev));
+      this.mesh.instanceMatrix.needsUpdate = true;
+      if (this.mesh.instanceColor) this.mesh.instanceColor.needsUpdate = true;
+    }
+    this.cursorId = id;
   }
 
   flash(id: number): void {
@@ -290,6 +327,7 @@ export class GraphView {
     this.spawns = [];
     this.flashes = [];
     this.maxRadius = 0;
+    this.cursorId = -1;
   }
 
   frame(dt: number): void {
@@ -319,10 +357,26 @@ export class GraphView {
         const f = this.flashes[i];
         f.t += dt;
         const k = Math.min(1, f.t / FLASH_DUR);
-        this.tmpColor.copy(FLASH_COLOR).lerp(KIND_COLORS[this.kinds[f.id]], k);
+        this.tmpColor.copy(FLASH_COLOR).lerp(this.colorFor(f.id), k);
         this.mesh.setColorAt(f.id, this.tmpColor);
         if (k >= 1) this.flashes.splice(i, 1);
       }
+      if (this.mesh.instanceColor) this.mesh.instanceColor.needsUpdate = true;
+    }
+
+    // the expansion cursor pulses bright white so you can follow the search
+    if (this.cursorId >= 0 && this.cursorId < this.count) {
+      const id = this.cursorId;
+      const s = KIND_SCALES[this.kinds[id]] * (1.5 + Math.sin(this.time * 9) * 0.35);
+      this.dummy.makeScale(s, s, s);
+      this.dummy.setPosition(
+        this.positions[id * 3],
+        this.positions[id * 3 + 1],
+        this.positions[id * 3 + 2],
+      );
+      this.mesh.setMatrixAt(id, this.dummy);
+      this.mesh.setColorAt(id, this.tmpColor.setHex(0xffffff));
+      this.mesh.instanceMatrix.needsUpdate = true;
       if (this.mesh.instanceColor) this.mesh.instanceColor.needsUpdate = true;
     }
 

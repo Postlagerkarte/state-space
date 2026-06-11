@@ -1,34 +1,33 @@
-// Watch tab: breadth-first search visualized live — the state-space galaxy grows
-// node by node while the pseudocode panel and counters show what the algorithm
-// is doing. Click any node to inspect the board state it represents.
+// Watch tab: the game's own solver, visualized. Breadth-first search runs on
+// the same glide boards you play in Rush and Zen — every dot in the galaxy is
+// one board position, colored by how many moves deep the search found it, so
+// BFS literally reads as expanding waves. Click any dot to see its board.
 
 import { GraphView } from '../render/graphView';
 import { BoardView } from '../render/boardView';
-import { classicLayout } from '../render/layouts';
-import { LevelPicker } from '../ui/levelPicker';
+import { glideLayout } from '../render/layouts';
+import { GlidePicker, PickedLevel } from '../ui/glidePicker';
 import { el, fmt, TabController } from '../ui/dom';
-import { Move, State, classicRules, cloneState } from '../core/board';
+import { GMove, GState, gCloneState, glideRules } from '../core/glide';
 import { Solver, SolverEvent } from '../core/solver';
-import { levelById } from '../core/levels';
 
 const CODE_LINES = [
-  'frontier ← queue with [start]',
-  'seen ← { hash(start) }',
-  'while frontier not empty:',
-  '    state ← frontier.dequeue()',
-  '    for each move of state:',
-  '        if move is goal: return path',
-  '        h ← hash(move)',
-  '        if h ∈ seen: skip      # duplicate',
-  '        seen.add(h)',
-  '        frontier.enqueue(move)',
-  'return "no solution"',
+  'queue ← [ start position ]',
+  'seen ← { start }',
+  'while the queue is not empty:',
+  '    position ← take the next from the queue',
+  '    for every piece and direction:',
+  '        glide it until it hits something',
+  '        seen this position before? skip it',
+  '        goal reached? trace the path back!',
+  '        remember it · add it to the queue',
+  'queue empty? then it is unsolvable',
 ];
 const LINE_EXPAND = 3;
-const LINE_GOAL = 5;
-const LINE_DUP = 7;
-const LINE_DISCOVER = 9;
-const LINE_FAIL = 10;
+const LINE_DUP = 6;
+const LINE_GOAL = 7;
+const LINE_DISCOVER = 8;
+const LINE_FAIL = 9;
 
 export function createWatchTab(): TabController {
   const root = el(`
@@ -45,30 +44,31 @@ export function createWatchTab(): TabController {
             <input type="range" min="0" max="100" value="40" data-speed />
           </label>
         </div>
+        <div class="panel note big-note">
+          The solver plays <b>every possible move</b>, one wave at a time, and
+          never looks at the same position twice. Each glowing dot on the right
+          is one board position — <b>color = how many moves deep</b>.
+        </div>
+        <div class="stat-cards">
+          <div class="card cyan"><b data-s-explored>0</b><span>positions checked</span></div>
+          <div class="card"><b data-s-frontier>0</b><span>waiting in queue</span></div>
+          <div class="card red"><b data-s-dups>0</b><span>duplicates skipped</span></div>
+          <div class="card gold"><b data-s-wave>0</b><span>moves deep</span></div>
+        </div>
         <div class="panel code-panel">
           <h4>Breadth-first search</h4>
           <pre data-code></pre>
         </div>
-        <div class="panel stat-grid">
-          <span class="stat-label">explored</span><span class="stat-value" data-s-explored>0</span>
-          <span class="stat-label">frontier</span><span class="stat-value" data-s-frontier>0</span>
-          <span class="stat-label">duplicates pruned</span><span class="stat-value" data-s-dups>0</span>
-          <span class="stat-label">depth reached</span><span class="stat-value" data-s-depth>0</span>
-        </div>
         <div class="panel board-mini" data-mini></div>
-        <div class="panel note">
-          Without the <b>seen</b> set, every red flash would become a brand-new
-          branch — and the search would never finish. Duplicate detection is what
-          makes the state space finite.
-        </div>
       </aside>
       <div class="canvas-host" data-graph>
         <div class="banner" data-banner>pick a level and press Run</div>
         <div class="legend">
-          <span><i class="dot cyan"></i>frontier</span>
-          <span><i class="dot indigo"></i>explored</span>
-          <span><i class="dot red"></i>duplicate hit</span>
+          <span><i class="dot cyan"></i>frontier (queue)</span>
+          <span><i class="dot wave"></i>explored, by depth</span>
+          <span><i class="dot red"></i>duplicate skipped</span>
           <span><i class="dot gold"></i>solution path</span>
+          <span><i class="dot white"></i>looking at now</span>
         </div>
       </div>
     </section>
@@ -83,23 +83,26 @@ export function createWatchTab(): TabController {
   const sExplored = root.querySelector<HTMLElement>('[data-s-explored]')!;
   const sFrontier = root.querySelector<HTMLElement>('[data-s-frontier]')!;
   const sDups = root.querySelector<HTMLElement>('[data-s-dups]')!;
-  const sDepth = root.querySelector<HTMLElement>('[data-s-depth]')!;
+  const sWave = root.querySelector<HTMLElement>('[data-s-wave]')!;
 
-  codePre.innerHTML = CODE_LINES.map((l, i) => `<span class="code-line" data-line="${i}">${l}</span>`).join('\n');
+  codePre.innerHTML = CODE_LINES.map(
+    (l, i) => `<span class="code-line" data-line="${i}">${l}</span>`,
+  ).join('\n');
   const codeLineEls = Array.from(codePre.querySelectorAll<HTMLElement>('.code-line'));
 
-  const picker = new LevelPicker({ defaultId: 'warming-up' });
+  const picker = new GlidePicker({ defaultId: 'detour' });
   root.querySelector('[data-picker]')!.appendChild(picker.root);
 
   let graph: GraphView | null = null;
   let mini: BoardView | null = null;
-  let solver: Solver<State, Move> | null = null;
-  let levelState: State = cloneState(levelById('warming-up')!.state);
+  let solver: Solver<GState, GMove> | null = null;
+  let level: PickedLevel | null = null;
   let playing = false;
   let budget = 0;
   let lastExpanded = 0;
+  let wave = 0;
   let miniClock = 0;
-  let playback: State[] | null = null;
+  let playback: GState[] | null = null;
   let playbackStep = 0;
   let playbackClock = 0;
   let highlightLine = -1;
@@ -120,45 +123,48 @@ export function createWatchTab(): TabController {
     sExplored.textContent = fmt(solver.stats.explored);
     sFrontier.textContent = fmt(solver.frontierSize);
     sDups.textContent = fmt(solver.stats.duplicates);
-    sDepth.textContent = fmt(solver.stats.maxDepth);
+    sWave.textContent = fmt(wave);
   }
 
   function newRun(): void {
-    solver = new Solver(classicRules(picker.rotation), cloneState(levelState), 'bfs');
+    if (!level) return;
+    solver = new Solver(glideRules(level.spec), gCloneState(level.state), 'bfs');
     graph?.reset();
     graph?.addNode(0, -1, 0);
-    mini?.setLevel(levelState);
+    mini?.setLayout(glideLayout(level.spec));
+    mini?.setLevel(level.state);
     setPlaying(false);
     budget = 0;
     lastExpanded = 0;
+    wave = 0;
     playback = null;
     setHighlight(-1);
-    banner.textContent = `${levelState.length - 1} blockers — press Run, or Step through one expansion at a time`;
+    banner.textContent = `${level.name} — press Run, or Step through one position at a time`;
     updateStats();
   }
 
-  picker.onLevel = (state) => {
-    levelState = state;
+  picker.onLevel = (lvl) => {
+    level = lvl;
     newRun();
   };
-  picker.onRotationChange = () => newRun();
 
   function onDone(goalId: number | null): void {
     setPlaying(false);
+    graph?.setCursor(-1);
     if (!solver) return;
     if (goalId !== null) {
       const path = solver.path()!;
       graph?.tracePath(path.map((n) => n.id));
       setHighlight(LINE_GOAL);
       banner.textContent =
-        `solved — ${fmt(path.length - 1)} moves · explored ${fmt(solver.stats.explored)} states · ` +
-        `pruned ${fmt(solver.stats.duplicates)} duplicates`;
+        `solved in ${fmt(path.length - 1)} moves — checked ${fmt(solver.stats.explored)} positions, ` +
+        `skipped ${fmt(solver.stats.duplicates)} duplicates · replaying the gold path on the board`;
       playback = path.map((n) => n.state);
       playbackStep = 0;
       playbackClock = 0;
     } else {
       setHighlight(LINE_FAIL);
-      banner.textContent = `no solution — the entire reachable space is ${fmt(solver.nodes.length)} states`;
+      banner.textContent = `unsolvable — the solver tried every one of its ${fmt(solver.nodes.length)} reachable positions`;
     }
   }
 
@@ -167,7 +173,9 @@ export function createWatchTab(): TabController {
       switch (evt.type) {
         case 'expand':
           graph?.markExpanded(evt.id);
+          graph?.setCursor(evt.id);
           lastExpanded = evt.id;
+          wave = solver?.nodes[evt.id].depth ?? wave;
           setHighlight(LINE_EXPAND);
           break;
         case 'discover':
@@ -203,10 +211,13 @@ export function createWatchTab(): TabController {
         budget -= n;
         while (n-- > 0 && !solver.done) process(solver.step());
         updateStats();
+        if (!solver.done) {
+          banner.textContent = `wave ${wave} — ${fmt(solver.stats.explored)} positions explored`;
+        }
       }
     }
 
-    // show the state being expanded (throttled so it reads as a flipbook)
+    // show the position being inspected (throttled so it reads as a flipbook)
     if (solver && !solver.done && playing) {
       miniClock += dt;
       if (miniClock > 0.15) {
@@ -218,7 +229,7 @@ export function createWatchTab(): TabController {
 
     if (playback) {
       playbackClock += dt;
-      if (playbackClock > 0.28) {
+      if (playbackClock > 0.45) {
         playbackClock = 0;
         if (playbackStep < playback.length) {
           mini?.applyState(playback[playbackStep], true);
@@ -247,7 +258,7 @@ export function createWatchTab(): TabController {
   });
   root.querySelector('[data-restart]')!.addEventListener('click', newRun);
 
-  // click a node to inspect the state it represents
+  // click a node to inspect the position it represents
   let down: { x: number; y: number } | null = null;
   graphHost.addEventListener('pointerdown', (e) => (down = { x: e.clientX, y: e.clientY }));
   graphHost.addEventListener('pointerup', (e) => {
@@ -260,7 +271,7 @@ export function createWatchTab(): TabController {
       setPlaying(false);
       playback = null;
       mini?.applyState(solver.nodes[id].state, true);
-      banner.textContent = `state #${fmt(id)} — depth ${solver.nodes[id].depth} (${solver.nodes[id].depth} moves from the start)`;
+      banner.textContent = `position #${fmt(id)} — ${solver.nodes[id].depth} moves from the start`;
     }
   });
 
@@ -281,8 +292,14 @@ export function createWatchTab(): TabController {
       if (!built) {
         built = true;
         graph = new GraphView(graphHost, { maxNodes: 60_000, bloom: true });
-        mini = new BoardView(miniHost, classicLayout(), { interactive: false });
+        graph.depthWaves = true;
+        // mini board needs a layout up front; the picker will set the real one
+        mini = null;
         picker.load();
+        if (level) {
+          mini = new BoardView(miniHost, glideLayout(level.spec), { interactive: false });
+          mini.setLevel(level.state);
+        }
         if (new URLSearchParams(location.search).get('run') === '1') setPlaying(true);
       }
       last = performance.now();

@@ -497,6 +497,76 @@ input[type='range'] {
   height: 240px;
   position: relative;
   overflow: hidden;
+  flex-shrink: 0;
+}
+
+.big-note {
+  font-size: 13.5px;
+  line-height: 1.6;
+}
+
+.stat-cards {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  flex: 0 0 auto;
+}
+
+.stat-cards .card {
+  background: var(--panel);
+  border: 1px solid var(--panel-border);
+  border-radius: var(--radius);
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.stat-cards .card b {
+  font-size: 24px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+
+.stat-cards .card span {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--muted);
+}
+
+.stat-cards .card.cyan b {
+  color: var(--cyan);
+  text-shadow: 0 0 14px rgba(89, 227, 255, 0.45);
+}
+
+.stat-cards .card.red b {
+  color: var(--red);
+}
+
+.stat-cards .card.gold b {
+  color: var(--gold);
+  text-shadow: 0 0 14px rgba(255, 183, 3, 0.45);
+}
+
+.dot.wave {
+  background: linear-gradient(135deg, #5560a8, #c44fae, #e8556d);
+}
+
+.dot.white {
+  background: #ffffff;
+  box-shadow: 0 0 8px #ffffff;
+}
+
+.rules-badge {
+  width: 100%;
+  margin: 4px 0 6px;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.rules-badge b {
+  color: var(--text);
 }
 
 .board-mini canvas {

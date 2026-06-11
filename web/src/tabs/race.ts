@@ -58,6 +58,8 @@ export function createRaceTab(): TabController {
           <button class="btn primary" data-start>▶ Start race</button>
           <button class="btn" data-reset>Reset</button>
         </div>
+        <p class="rules-badge">runs the <b>classic 2014 sliding rules</b> — their bigger
+        state space makes the differences between the algorithms vivid</p>
       </div>
       <div class="race-grid" data-grid></div>
       <div class="panel race-summary" data-summary hidden></div>
