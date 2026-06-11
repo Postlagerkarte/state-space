@@ -6,7 +6,7 @@ import { BoardView } from '../render/boardView';
 import { glideLayout } from '../render/layouts';
 import { el, TabController } from '../ui/dom';
 import { GlidePicker, PickedLevel, setStars } from '../ui/glidePicker';
-import { GMove, GState, gCloneState, gIsSolved, glideMove, glideRules } from '../core/glide';
+import { GLIDE_DIRS, GMove, GState, gCloneState, gIsSolved, glideMove, glideRules } from '../core/glide';
 import { Solver } from '../core/solver';
 import * as sound from '../game/sound';
 
@@ -42,10 +42,10 @@ export function createPlayTab(): TabController {
             <button class="btn" data-reset>Reset</button>
             <button class="btn" data-mute title="Toggle sound"></button>
           </div>
-          <p class="hint"><b>Drag a piece</b> — it glides until it hits something.
-          Park the <b class="gold">gold block</b> so it covers the glowing pad exactly;
-          if nothing stops it there, it flies right past. Arrow keys move the
-          selected piece.</p>
+          <p class="hint"><b>Hover a piece</b> to see every spot it can glide to —
+          click a ghost (or drag the piece) to make the move. Park the
+          <b class="gold">gold block</b> so it covers the glowing pad exactly;
+          a <b class="gold">pulsing gold ghost</b> means you're one move from winning.</p>
         </div>
         <div class="panel note">
           Par is computed live by breadth-first search — every level you play is a
@@ -116,6 +116,39 @@ export function createPlayTab(): TabController {
   }
   updateMuteLabel();
 
+  // -- landing previews --------------------------------------------------------
+  // Hovering or selecting a piece shows ghost copies at every spot it can glide
+  // to (clickable). This is what makes harder boards readable: the possibility
+  // space becomes visible instead of something you must imagine.
+
+  let hoverIdx = -1;
+
+  function refreshPreviews(): void {
+    if (!board || !level || solvedShown) {
+      board?.clearPreviews();
+      return;
+    }
+    const idx = hoverIdx >= 0 ? hoverIdx : selected;
+    if (idx < 0 || idx >= current.length) {
+      board.clearPreviews();
+      return;
+    }
+    const specs = [];
+    for (const [dr, dc] of GLIDE_DIRS) {
+      const slid = glideMove(level.spec, current, idx, dr, dc);
+      if (!slid) continue;
+      const placement = slid.state[idx];
+      specs.push({
+        placement,
+        pieceIdx: idx,
+        dr,
+        dc,
+        onGoal: idx === 0 && placement.index === level.spec.goal,
+      });
+    }
+    board.showPreviews(specs, current[idx].index);
+  }
+
   // -- drag-to-glide input ---------------------------------------------------
 
   let drag: { pieceIdx: number; x: number; y: number; committed: boolean } | null = null;
@@ -126,20 +159,43 @@ export function createPlayTab(): TabController {
     canvas.addEventListener(
       'pointerdown',
       (e) => {
+        // clicking a landing ghost executes that move directly
+        const preview = bv.pickPreviewAt(e.clientX, e.clientY);
+        if (preview) {
+          tryGlide(preview.pieceIdx, preview.dr, preview.dc);
+          return;
+        }
         const idx = bv.pickAt(e.clientX, e.clientY);
         if (idx === null) {
           selected = -1;
           bv.setSelected(-1);
+          refreshPreviews();
           return;
         }
         selected = idx;
         bv.setSelected(idx);
+        refreshPreviews();
         drag = { pieceIdx: idx, x: e.clientX, y: e.clientY, committed: false };
         bv.setOrbitEnabled(false);
         canvas.setPointerCapture(e.pointerId);
       },
       { capture: true },
     );
+    canvas.addEventListener('pointermove', (e) => {
+      if (drag || solvedShown) return;
+      // keep previews stable while the pointer is over one of the ghosts
+      if (bv.pickPreviewAt(e.clientX, e.clientY)) {
+        canvas.style.cursor = 'pointer';
+        return;
+      }
+      const idx = bv.pickAt(e.clientX, e.clientY);
+      canvas.style.cursor = idx !== null ? 'grab' : 'default';
+      const next = idx ?? -1;
+      if (next !== hoverIdx) {
+        hoverIdx = next;
+        refreshPreviews();
+      }
+    });
     canvas.addEventListener('pointermove', (e) => {
       if (!drag || drag.committed) return;
       const dx = e.clientX - drag.x;
@@ -188,6 +244,7 @@ export function createPlayTab(): TabController {
     current = gCloneState(lvl.state);
     history = [gCloneState(lvl.state)];
     selected = -1;
+    hoverIdx = -1;
     hintsUsed = false;
     solvedShown = false;
     overlay.hidden = true;
@@ -204,13 +261,13 @@ export function createPlayTab(): TabController {
     if (!level || !board || solvedShown) return;
     const slid = glideMove(level.spec, current, pieceIdx, dr, dc);
     if (!slid) {
-      board.pulseInvalid(pieceIdx);
-      sound.blocked();
+      board.pulseInvalid(pieceIdx, dr, dc);
+      sound.knock();
       return;
     }
     current = slid.state;
     history.push(gCloneState(current));
-    board.clearHint();
+    board.clearHintRun();
     toast.hidden = true;
     const dur = board.applyState(current);
     sound.whoosh(slid.dist);
@@ -218,10 +275,12 @@ export function createPlayTab(): TabController {
     impactAt = performance.now() + dur * 1000;
     setTimeout(() => sound.thunk(Math.min(1, slid.dist / 6)), Math.max(0, dur * 1000 - 40));
     updateMoves();
+    refreshPreviews();
 
     if (gIsSolved(level.spec, current)) {
       solvedShown = true;
       distSolver = null;
+      board.clearPreviews();
       // the melody's top note lands with the final impact, then resolves
       setTimeout(() => sound.melodyNote(baseDist), Math.max(0, dur * 1000 - 10));
       setTimeout(() => {
@@ -263,10 +322,12 @@ export function createPlayTab(): TabController {
     if (history.length < 2 || solvedShown || !board) return;
     history.pop();
     current = gCloneState(history[history.length - 1]);
-    board.clearHint();
+    board.clearHintRun();
     toast.hidden = true;
     board.applyState(current);
+    sound.swishBack();
     updateMoves();
+    refreshPreviews();
     // recompute the distance silently so the melody baseline stays honest
     prevDist = null;
     startDistCheck();
@@ -279,14 +340,17 @@ export function createPlayTab(): TabController {
     const path = solver.path();
     if (!path || path.length < 2) {
       board.pulseInvalid(0);
-      sound.blocked();
+      sound.knock();
       return;
     }
     const move = path[1].move as GMove;
     hintsUsed = true;
     selected = move.pieceIdx;
+    hoverIdx = -1;
     board.setSelected(selected);
-    board.showHint(move.pieceIdx, move.dr, move.dc);
+    refreshPreviews();
+    // a ghost of the piece glides the optimal path so the move's shape is visible
+    board.playHintRun(move.pieceIdx, path[1].state[move.pieceIdx].index);
   }
 
   function reset(): void {
@@ -323,6 +387,7 @@ export function createPlayTab(): TabController {
     } else if (e.key === 'Escape') {
       selected = -1;
       board?.setSelected(-1);
+      refreshPreviews();
     }
   }
 

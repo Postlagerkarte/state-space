@@ -25,6 +25,13 @@ try {
   await page.waitForSelector('.tab-play canvas');
   await sleep(1500); // level load, board build, first frames
 
+  // Hover the hero first: landing previews (ghosts) should appear.
+  await page.mouse.move(320, 470);
+  await sleep(120);
+  await page.mouse.move(322, 472);
+  await sleep(500);
+  await page.screenshot({ path: `${OUT}/smoke-previews.png` });
+
   // Tutorial 1: hero is the only piece, sitting center-left. Click candidate
   // spots and press ArrowRight after each — extra inputs after the win are no-ops.
   const candidates: [number, number][] = [
@@ -39,9 +46,11 @@ try {
     await sleep(100);
     await page.keyboard.press('ArrowRight');
     await sleep(250);
+    const moves = await page.evaluate(() => document.querySelector('[data-moves]')?.textContent);
+    if (moves === '1') break; // solved — stop poking so we can catch the fireworks
   }
 
-  await sleep(700); // glide lands, confetti mid-burst
+  await sleep(450); // mid-burst
   await page.screenshot({ path: `${OUT}/smoke-confetti.png` });
 
   await sleep(1500); // overlay + stars staggered in

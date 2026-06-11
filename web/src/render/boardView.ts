@@ -28,6 +28,28 @@ function easeOutCubic(t: number): number {
   return 1 - Math.pow(1 - t, 3);
 }
 
+// Soft radial glow sprite for the firework particles (generated once).
+let glowTexture: THREE.Texture | null = null;
+function getGlowTexture(): THREE.Texture {
+  if (!glowTexture) {
+    const size = 64;
+    const canvas = document.createElement('canvas');
+    canvas.width = size;
+    canvas.height = size;
+    const ctx = canvas.getContext('2d')!;
+    const grad = ctx.createRadialGradient(size / 2, size / 2, 0, size / 2, size / 2, size / 2);
+    grad.addColorStop(0, 'rgba(255,255,255,1)');
+    grad.addColorStop(0.35, 'rgba(255,255,255,0.6)');
+    grad.addColorStop(1, 'rgba(255,255,255,0)');
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, size, size);
+    glowTexture = new THREE.CanvasTexture(canvas);
+  }
+  return glowTexture;
+}
+
+const FIREWORK_COLORS = [0xffd166, 0x59e3ff, 0xff5da2, 0x9b5de5, 0xffffff];
+
 interface SlideTween {
   group: THREE.Group;
   fromX: number;
@@ -73,15 +95,31 @@ export class BoardView {
   private scales: ScaleTween[] = [];
   private shakes: { group: THREE.Group; t: number }[] = [];
   private punches: { group: THREE.Group; axis: 'x' | 'z'; t: number }[] = [];
-  private hint: { arrow: THREE.ArrowHelper; baseY: number; t: number } | null = null;
   private ghosts: { group: THREE.Group; mat: THREE.MeshBasicMaterial; t: number }[] = [];
   private dusts: { points: THREE.Points; vels: Float32Array; mat: THREE.PointsMaterial; t: number }[] = [];
-  private confettiSys: {
-    mesh: THREE.InstancedMesh;
-    pos: Float32Array;
-    vel: Float32Array;
-    spin: Float32Array;
+  private fireworks: {
+    points: THREE.Points;
+    vels: Float32Array;
+    base: Float32Array;
+    mat: THREE.PointsMaterial;
     t: number;
+    life: number;
+  }[] = [];
+  private ringsFx: { mesh: THREE.Mesh; mat: THREE.MeshBasicMaterial; t: number }[] = [];
+  private celebrateEvents: { at: number; fn: () => void }[] = [];
+  private spins: { group: THREE.Group; t: number }[] = [];
+  private presses: { group: THREE.Group; dirX: number; dirZ: number; t: number }[] = [];
+  private previews: { group: THREE.Group; mat: THREE.MeshBasicMaterial; onGoal: boolean }[] = [];
+  private previewStrips: { mesh: THREE.Mesh; mat: THREE.MeshBasicMaterial }[] = [];
+  private hintRun: {
+    group: THREE.Group;
+    mat: THREE.MeshBasicMaterial;
+    fromX: number;
+    fromZ: number;
+    toX: number;
+    toZ: number;
+    t: number;
+    runs: number;
   } | null = null;
   private camShake = 0;
   private selected = -1;
@@ -270,9 +308,11 @@ export class BoardView {
       d.mat.dispose();
     }
     this.dusts = [];
-    this.disposeConfetti();
+    this.clearCelebrationFx();
+    this.clearPreviews();
+    this.clearHintRun();
+    this.presses = [];
     this.camShake = 0;
-    this.clearHint();
     this.selected = -1;
     this.celebrateT = -1;
 
@@ -370,14 +410,254 @@ export class BoardView {
     });
   }
 
-  pulseInvalid(pieceIdx: number): void {
+  /** Blocked move: lean the piece into the wall it pressed against. */
+  pulseInvalid(pieceIdx: number, dr = 0, dc = 0): void {
     const group = this.pieceGroups[pieceIdx];
-    if (group) this.shakes.push({ group, t: 0 });
+    if (!group) return;
+    if (dr === 0 && dc === 0) {
+      this.shakes.push({ group, t: 0 });
+    } else {
+      this.presses.push({ group, dirX: dc, dirZ: dr, t: 0 });
+    }
   }
 
   celebrate(): void {
     this.celebrateT = 0;
-    this.spawnConfetti();
+    const [cx, cz] = this.goalCenter();
+    this.spawnRing(cx, cz);
+    this.spawnFirework(cx, cz, 170, 7, 1.6);
+    this.celebrateEvents = [
+      { at: 0.22, fn: () => this.spawnFirework(cx, cz, 90, 5, 1.3) },
+      { at: 0.5, fn: () => { this.spawnRing(cx, cz); this.spawnFirework(cx, cz, 70, 4, 1.1); } },
+    ];
+    if (this.pieceGroups[0]) this.spins.push({ group: this.pieceGroups[0], t: 0 });
+  }
+
+  private goalCenter(): [number, number] {
+    const cells = this.layout.goalCells;
+    let cx = 0;
+    let cz = 0;
+    for (const cell of cells) {
+      cx += this.cellX(cell);
+      cz += this.cellZ(cell);
+    }
+    return [cx / cells.length, cz / cells.length];
+  }
+
+  /** Expanding additive shockwave ring on the board surface. */
+  private spawnRing(cx: number, cz: number): void {
+    const mat = new THREE.MeshBasicMaterial({
+      color: 0xffd166,
+      transparent: true,
+      opacity: 0.55,
+      side: THREE.DoubleSide,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false,
+    });
+    const mesh = new THREE.Mesh(new THREE.RingGeometry(0.42, 0.55, 48), mat);
+    mesh.rotation.x = -Math.PI / 2;
+    mesh.position.set(cx, 0.14, cz);
+    this.scene.add(mesh);
+    this.ringsFx.push({ mesh, mat, t: 0 });
+  }
+
+  /** Additive glow-particle burst — neon fireworks rather than paper confetti. */
+  private spawnFirework(cx: number, cz: number, count: number, speed: number, life: number): void {
+    const positions = new Float32Array(count * 3);
+    const colors = new Float32Array(count * 3);
+    const base = new Float32Array(count * 3);
+    const vels = new Float32Array(count * 3);
+    const c = new THREE.Color();
+    for (let i = 0; i < count; i++) {
+      positions[i * 3] = cx + (Math.random() - 0.5) * 0.8;
+      positions[i * 3 + 1] = 0.35;
+      positions[i * 3 + 2] = cz + (Math.random() - 0.5) * 0.8;
+      const angle = Math.random() * Math.PI * 2;
+      const radial = Math.random() * speed * 0.55;
+      vels[i * 3] = Math.cos(angle) * radial;
+      vels[i * 3 + 1] = speed * (0.45 + Math.random() * 0.8);
+      vels[i * 3 + 2] = Math.sin(angle) * radial;
+      c.setHex(FIREWORK_COLORS[(Math.random() * FIREWORK_COLORS.length) | 0]);
+      base[i * 3] = c.r;
+      base[i * 3 + 1] = c.g;
+      base[i * 3 + 2] = c.b;
+      colors[i * 3] = c.r;
+      colors[i * 3 + 1] = c.g;
+      colors[i * 3 + 2] = c.b;
+    }
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+    geo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+    const mat = new THREE.PointsMaterial({
+      size: 0.34,
+      map: getGlowTexture(),
+      transparent: true,
+      vertexColors: true,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false,
+    });
+    const points = new THREE.Points(geo, mat);
+    points.frustumCulled = false;
+    this.scene.add(points);
+    this.fireworks.push({ points, vels, base, mat, t: 0, life });
+  }
+
+  private clearCelebrationFx(): void {
+    for (const f of this.fireworks) {
+      this.scene.remove(f.points);
+      f.points.geometry.dispose();
+      f.mat.dispose();
+    }
+    this.fireworks = [];
+    for (const r of this.ringsFx) {
+      this.scene.remove(r.mesh);
+      r.mesh.geometry.dispose();
+      r.mat.dispose();
+    }
+    this.ringsFx = [];
+    this.celebrateEvents = [];
+    this.spins = [];
+  }
+
+  // -- landing previews -------------------------------------------------------
+
+  /**
+   * Ghost copies of a piece at each position it could glide to. Hovering or
+   * selecting a piece calls this — the board explains itself. Ghost meshes
+   * carry the move in userData so they are directly clickable.
+   */
+  showPreviews(
+    specs: { placement: ViewPlacement; pieceIdx: number; dr: number; dc: number; onGoal: boolean }[],
+    fromIndex: number,
+  ): void {
+    this.clearPreviews();
+    const { width } = this.layout;
+    for (const spec of specs) {
+      const color = spec.onGoal ? 0xffd166 : this.layout.color(spec.placement);
+      const mat = new THREE.MeshBasicMaterial({
+        color,
+        transparent: true,
+        opacity: spec.onGoal ? 0.42 : 0.15,
+        depthWrite: false,
+      });
+      const group = new THREE.Group();
+      group.position.set(this.cellX(spec.placement.index), 0, this.cellZ(spec.placement.index));
+      const aR = (spec.placement.index / width) | 0;
+      const aC = spec.placement.index % width;
+      for (const cell of this.layout.cells(spec.placement)) {
+        const mesh = new THREE.Mesh(this.cubeGeo, mat);
+        mesh.position.set((cell % width) - aC, 0.46, ((cell / width) | 0) - aR);
+        mesh.userData.previewMove = { pieceIdx: spec.pieceIdx, dr: spec.dr, dc: spec.dc };
+        group.add(mesh);
+      }
+      this.scene.add(group);
+      this.previews.push({ group, mat, onGoal: spec.onGoal });
+
+      // faint path strip from the piece to the landing spot
+      const fromX = this.cellX(fromIndex);
+      const fromZ = this.cellZ(fromIndex);
+      const toX = this.cellX(spec.placement.index);
+      const toZ = this.cellZ(spec.placement.index);
+      const len = Math.max(Math.abs(toX - fromX), Math.abs(toZ - fromZ));
+      if (len > 0.5) {
+        const alongX = Math.abs(toX - fromX) > Math.abs(toZ - fromZ);
+        const stripMat = new THREE.MeshBasicMaterial({
+          color,
+          transparent: true,
+          opacity: 0.08,
+          blending: THREE.AdditiveBlending,
+          depthWrite: false,
+        });
+        const strip = new THREE.Mesh(
+          new THREE.BoxGeometry(alongX ? len : 0.24, 0.02, alongX ? 0.24 : len),
+          stripMat,
+        );
+        strip.position.set((fromX + toX) / 2, 0.12, (fromZ + toZ) / 2);
+        this.scene.add(strip);
+        this.previewStrips.push({ mesh: strip, mat: stripMat });
+      }
+    }
+  }
+
+  clearPreviews(): void {
+    for (const p of this.previews) {
+      this.scene.remove(p.group);
+      p.mat.dispose();
+    }
+    this.previews = [];
+    for (const s of this.previewStrips) {
+      this.scene.remove(s.mesh);
+      s.mesh.geometry.dispose();
+      s.mat.dispose();
+    }
+    this.previewStrips = [];
+  }
+
+  /** Which preview ghost is under the pointer? Returns the move it represents. */
+  pickPreviewAt(
+    clientX: number,
+    clientY: number,
+  ): { pieceIdx: number; dr: number; dc: number } | null {
+    if (this.previews.length === 0) return null;
+    const rect = this.renderer.domElement.getBoundingClientRect();
+    const ndc = new THREE.Vector2(
+      ((clientX - rect.left) / rect.width) * 2 - 1,
+      -((clientY - rect.top) / rect.height) * 2 + 1,
+    );
+    const ray = new THREE.Raycaster();
+    ray.setFromCamera(ndc, this.camera);
+    const hits = ray.intersectObjects(
+      this.previews.map((p) => p.group),
+      true,
+    );
+    for (const hit of hits) {
+      const move = hit.object.userData.previewMove;
+      if (move) return move as { pieceIdx: number; dr: number; dc: number };
+    }
+    return null;
+  }
+
+  /** Hint: a ghost of the piece repeatedly glides its optimal path. */
+  playHintRun(pieceIdx: number, toIndex: number): void {
+    this.clearHintRun();
+    if (!this.state) return;
+    const p = this.state[pieceIdx];
+    const srcMat = this.pieceGroups[pieceIdx].userData.material as THREE.MeshStandardMaterial;
+    const mat = new THREE.MeshBasicMaterial({
+      color: srcMat.color,
+      transparent: true,
+      opacity: 0.4,
+      depthWrite: false,
+    });
+    const group = new THREE.Group();
+    const { width } = this.layout;
+    const aR = (p.index / width) | 0;
+    const aC = p.index % width;
+    for (const cell of this.layout.cells(p)) {
+      const mesh = new THREE.Mesh(this.cubeGeo, mat);
+      mesh.position.set((cell % width) - aC, 0.46, ((cell / width) | 0) - aR);
+      group.add(mesh);
+    }
+    group.position.set(this.cellX(p.index), 0, this.cellZ(p.index));
+    this.scene.add(group);
+    this.hintRun = {
+      group,
+      mat,
+      fromX: this.cellX(p.index),
+      fromZ: this.cellZ(p.index),
+      toX: this.cellX(toIndex),
+      toZ: this.cellZ(toIndex),
+      t: 0,
+      runs: 3,
+    };
+  }
+
+  clearHintRun(): void {
+    if (this.hintRun) {
+      this.scene.remove(this.hintRun.group);
+      this.hintRun.mat.dispose();
+      this.hintRun = null;
+    }
   }
 
   /** Translucent afterimage of a gliding piece (motion trail). */
@@ -426,86 +706,6 @@ export class BoardView {
     points.frustumCulled = false;
     this.scene.add(points);
     this.dusts.push({ points, vels, mat, t: 0 });
-  }
-
-  /** Confetti burst from the goal pad. */
-  private spawnConfetti(): void {
-    this.disposeConfetti();
-    const cells = this.layout.goalCells;
-    let cx = 0;
-    let cz = 0;
-    for (const cell of cells) {
-      cx += this.cellX(cell);
-      cz += this.cellZ(cell);
-    }
-    cx /= cells.length;
-    cz /= cells.length;
-
-    const count = 140;
-    const colors = [0xffb703, 0x59e3ff, 0x4d7cfe, 0x9b5de5, 0x6fbf4a, 0xe05263, 0xffffff];
-    const geo = new THREE.BoxGeometry(0.14, 0.14, 0.03);
-    const mat = new THREE.MeshBasicMaterial();
-    const mesh = new THREE.InstancedMesh(geo, mat, count);
-    mesh.frustumCulled = false;
-    mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
-    const pos = new Float32Array(count * 3);
-    const vel = new Float32Array(count * 3);
-    const spin = new Float32Array(count * 4); // axis xyz + speed
-    const color = new THREE.Color();
-    for (let i = 0; i < count; i++) {
-      pos[i * 3] = cx + (Math.random() - 0.5) * 1.4;
-      pos[i * 3 + 1] = 0.3;
-      pos[i * 3 + 2] = cz + (Math.random() - 0.5) * 1.4;
-      vel[i * 3] = (Math.random() - 0.5) * 4.5;
-      vel[i * 3 + 1] = 3.5 + Math.random() * 4.5;
-      vel[i * 3 + 2] = (Math.random() - 0.5) * 4.5;
-      const axis = new THREE.Vector3(Math.random() - 0.5, Math.random() - 0.5, Math.random() - 0.5).normalize();
-      spin[i * 4] = axis.x;
-      spin[i * 4 + 1] = axis.y;
-      spin[i * 4 + 2] = axis.z;
-      spin[i * 4 + 3] = 4 + Math.random() * 9;
-      mesh.setColorAt(i, color.setHex(colors[(Math.random() * colors.length) | 0]));
-    }
-    if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
-    this.scene.add(mesh);
-    this.confettiSys = { mesh, pos, vel, spin, t: 0 };
-  }
-
-  private disposeConfetti(): void {
-    if (!this.confettiSys) return;
-    this.scene.remove(this.confettiSys.mesh);
-    this.confettiSys.mesh.geometry.dispose();
-    (this.confettiSys.mesh.material as THREE.Material).dispose();
-    this.confettiSys = null;
-  }
-
-  /** Float a golden arrow over a piece pointing in board direction (dr, dc). */
-  showHint(pieceIdx: number, dr: number, dc: number): void {
-    this.clearHint();
-    const group = this.pieceGroups[pieceIdx];
-    if (!group || !this.state) return;
-    const cells = this.layout.cells(this.state[pieceIdx]);
-    let cx = 0;
-    let cz = 0;
-    for (const cell of cells) {
-      cx += this.cellX(cell);
-      cz += this.cellZ(cell);
-    }
-    cx /= cells.length;
-    cz /= cells.length;
-    const dir = new THREE.Vector3(dc, 0, dr).normalize();
-    const baseY = 1.35;
-    const arrow = new THREE.ArrowHelper(dir, new THREE.Vector3(cx, baseY, cz), 1.5, 0xffc933, 0.55, 0.34);
-    this.scene.add(arrow);
-    this.hint = { arrow, baseY, t: 0 };
-  }
-
-  clearHint(): void {
-    if (this.hint) {
-      this.scene.remove(this.hint.arrow);
-      this.hint.arrow.dispose();
-      this.hint = null;
-    }
   }
 
   /** Which piece is under the pointer? Returns its index in the state, or null. */
@@ -601,37 +801,73 @@ export class BoardView {
       d.mat.opacity = 0.8 * (1 - d.t / 0.45);
     }
 
-    if (this.confettiSys) {
-      const sys = this.confettiSys;
-      sys.t += dt;
-      if (sys.t >= 2.4) {
-        this.disposeConfetti();
-      } else {
-        const m = new THREE.Matrix4();
-        const q = new THREE.Quaternion();
-        const axis = new THREE.Vector3();
-        const fade = sys.t > 1.9 ? Math.max(0.01, 1 - (sys.t - 1.9) / 0.5) : 1;
-        const n = sys.mesh.count;
-        for (let i = 0; i < n; i++) {
-          sys.pos[i * 3] += sys.vel[i * 3] * dt;
-          sys.pos[i * 3 + 1] += sys.vel[i * 3 + 1] * dt;
-          sys.pos[i * 3 + 2] += sys.vel[i * 3 + 2] * dt;
-          sys.vel[i * 3 + 1] -= 7.5 * dt;
-          // bounce softly off the board
-          if (sys.pos[i * 3 + 1] < 0.08 && sys.vel[i * 3 + 1] < 0) {
-            sys.pos[i * 3 + 1] = 0.08;
-            sys.vel[i * 3 + 1] *= -0.35;
-            sys.vel[i * 3] *= 0.7;
-            sys.vel[i * 3 + 2] *= 0.7;
-          }
-          axis.set(sys.spin[i * 4], sys.spin[i * 4 + 1], sys.spin[i * 4 + 2]);
-          q.setFromAxisAngle(axis, sys.spin[i * 4 + 3] * sys.t);
-          m.makeRotationFromQuaternion(q);
-          m.scale(new THREE.Vector3(fade, fade, fade));
-          m.setPosition(sys.pos[i * 3], sys.pos[i * 3 + 1], sys.pos[i * 3 + 2]);
-          sys.mesh.setMatrixAt(i, m);
+    // staged celebration bursts
+    if (this.celebrateT >= 0 && this.celebrateEvents.length > 0) {
+      for (let i = this.celebrateEvents.length - 1; i >= 0; i--) {
+        if (this.celebrateT >= this.celebrateEvents[i].at) {
+          this.celebrateEvents[i].fn();
+          this.celebrateEvents.splice(i, 1);
         }
-        sys.mesh.instanceMatrix.needsUpdate = true;
+      }
+    }
+
+    for (let i = this.fireworks.length - 1; i >= 0; i--) {
+      const f = this.fireworks[i];
+      f.t += dt;
+      if (f.t >= f.life) {
+        this.scene.remove(f.points);
+        f.points.geometry.dispose();
+        f.mat.dispose();
+        this.fireworks.splice(i, 1);
+        continue;
+      }
+      const pos = f.points.geometry.attributes.position.array as Float32Array;
+      const col = f.points.geometry.attributes.color.array as Float32Array;
+      const fade = Math.max(0, 1 - f.t / f.life);
+      const drag = Math.exp(-dt * 1.1);
+      for (let p = 0; p < pos.length / 3; p++) {
+        pos[p * 3] += f.vels[p * 3] * dt;
+        pos[p * 3 + 1] += f.vels[p * 3 + 1] * dt;
+        pos[p * 3 + 2] += f.vels[p * 3 + 2] * dt;
+        f.vels[p * 3] *= drag;
+        f.vels[p * 3 + 1] = f.vels[p * 3 + 1] * drag - 5.5 * dt;
+        f.vels[p * 3 + 2] *= drag;
+        // additive blending: fading the color to black fades the particle out
+        col[p * 3] = f.base[p * 3] * fade;
+        col[p * 3 + 1] = f.base[p * 3 + 1] * fade;
+        col[p * 3 + 2] = f.base[p * 3 + 2] * fade;
+      }
+      f.points.geometry.attributes.position.needsUpdate = true;
+      f.points.geometry.attributes.color.needsUpdate = true;
+    }
+
+    for (let i = this.ringsFx.length - 1; i >= 0; i--) {
+      const r = this.ringsFx[i];
+      r.t += dt;
+      const k = r.t / 0.55;
+      if (k >= 1) {
+        this.scene.remove(r.mesh);
+        r.mesh.geometry.dispose();
+        r.mat.dispose();
+        this.ringsFx.splice(i, 1);
+      } else {
+        const s = 0.6 + easeOutCubic(k) * 7;
+        r.mesh.scale.set(s, s, s);
+        r.mat.opacity = 0.55 * (1 - k);
+      }
+    }
+
+    // hero victory spin-jump
+    for (let i = this.spins.length - 1; i >= 0; i--) {
+      const s = this.spins[i];
+      s.t += dt;
+      const k = Math.min(1, s.t / 0.75);
+      s.group.rotation.y = Math.PI * 2 * easeOutCubic(k);
+      s.group.position.y = Math.sin(k * Math.PI) * 0.55;
+      if (k >= 1) {
+        s.group.rotation.y = 0;
+        s.group.position.y = 0;
+        this.spins.splice(i, 1);
       }
     }
 
@@ -675,14 +911,49 @@ export class BoardView {
       }
     }
 
-    if (this.hint) {
-      this.hint.t += dt;
-      this.hint.arrow.position.y = this.hint.baseY + Math.sin(this.hint.t * 4.5) * 0.1;
-      if (this.hint.t > 2.6) this.clearHint();
+    // directional "press into the wall" lean for blocked moves
+    for (let i = this.presses.length - 1; i >= 0; i--) {
+      const p = this.presses[i];
+      p.t += dt;
+      const k = Math.min(1, p.t / 0.24);
+      const s = Math.sin(k * Math.PI);
+      p.group.rotation.x = p.dirZ * 0.09 * s;
+      p.group.rotation.z = -p.dirX * 0.09 * s;
+      if (k >= 1) {
+        p.group.rotation.x = 0;
+        p.group.rotation.z = 0;
+        this.presses.splice(i, 1);
+      }
     }
 
-    // selected piece gently floats
+    // the on-goal landing preview pulses invitingly
+    for (const p of this.previews) {
+      if (p.onGoal) p.mat.opacity = 0.34 + Math.sin(this.time * 5) * 0.14;
+    }
+
+    // hint: ghost glides its optimal path, three times
+    if (this.hintRun) {
+      const h = this.hintRun;
+      h.t += dt;
+      const cycle = 0.85;
+      if (h.t >= cycle) {
+        h.t -= cycle;
+        h.runs--;
+        if (h.runs <= 0) this.clearHintRun();
+      }
+      if (this.hintRun) {
+        const k = Math.min(1, h.t / 0.6);
+        const e = k * k;
+        h.group.position.x = h.fromX + (h.toX - h.fromX) * e;
+        h.group.position.z = h.fromZ + (h.toZ - h.fromZ) * e;
+        h.mat.opacity = 0.4 * (h.t < 0.6 ? 1 : 1 - (h.t - 0.6) / 0.25);
+      }
+    }
+
+    // selected piece gently floats (victory spin owns the y while active)
+    const spinning = new Set(this.spins.map((s) => s.group));
     this.pieceGroups.forEach((g, i) => {
+      if (spinning.has(g)) return;
       const targetY = i === this.selected ? 0.1 + Math.sin(this.time * 5) * 0.04 : 0;
       g.position.y += (targetY - g.position.y) * Math.min(1, dt * 12);
     });

@@ -90,20 +90,62 @@ export function thunk(intensity: number): void {
   click.stop(t + 0.05);
 }
 
-/** Soft denied blip when a piece can't move that way. */
-export function blocked(): void {
+/**
+ * Soft wooden knock-knock when a piece is already against a wall.
+ * Deliberately gentle: bumping a wall is information, not failure.
+ */
+export function knock(): void {
+  const c = ensure();
+  if (!c) return;
+  for (const [offset, peak] of [
+    [0, 0.14],
+    [0.085, 0.09],
+  ] as const) {
+    const t = c.currentTime + offset;
+    const osc = c.createOscillator();
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(190, t);
+    osc.frequency.exponentialRampToValueAtTime(120, t + 0.05);
+    const gain = c.createGain();
+    gain.gain.setValueAtTime(peak, t);
+    gain.gain.exponentialRampToValueAtTime(0.001, t + 0.06);
+    osc.connect(gain).connect(c.destination);
+    osc.start(t);
+    osc.stop(t + 0.08);
+
+    const tap = c.createBufferSource();
+    tap.buffer = noise(c);
+    const lp = c.createBiquadFilter();
+    lp.type = 'lowpass';
+    lp.frequency.value = 450;
+    const tapGain = c.createGain();
+    tapGain.gain.setValueAtTime(peak * 0.6, t);
+    tapGain.gain.exponentialRampToValueAtTime(0.001, t + 0.04);
+    tap.connect(lp).connect(tapGain).connect(c.destination);
+    tap.start(t);
+    tap.stop(t + 0.05);
+  }
+}
+
+/** Friendly backwards swish for undo — rewinding, not failing. */
+export function swishBack(): void {
   const c = ensure();
   if (!c) return;
   const t = c.currentTime;
-  const osc = c.createOscillator();
-  osc.type = 'square';
-  osc.frequency.value = 95;
+  const src = c.createBufferSource();
+  src.buffer = noise(c);
+  const filter = c.createBiquadFilter();
+  filter.type = 'bandpass';
+  filter.Q.value = 1.4;
+  filter.frequency.setValueAtTime(300, t);
+  filter.frequency.exponentialRampToValueAtTime(1100, t + 0.18);
   const gain = c.createGain();
-  gain.gain.setValueAtTime(0.07, t);
-  gain.gain.exponentialRampToValueAtTime(0.001, t + 0.07);
-  osc.connect(gain).connect(c.destination);
-  osc.start(t);
-  osc.stop(t + 0.08);
+  gain.gain.setValueAtTime(0.001, t);
+  gain.gain.exponentialRampToValueAtTime(0.1, t + 0.03);
+  gain.gain.exponentialRampToValueAtTime(0.001, t + 0.2);
+  src.connect(filter).connect(gain).connect(c.destination);
+  src.start(t);
+  src.stop(t + 0.25);
 }
 
 // Major pentatonic over two octaves: any sequence of these sounds musical,

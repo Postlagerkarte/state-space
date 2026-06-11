@@ -55,6 +55,18 @@ export const GLIDE_LEVELS: GlideLevelDef[] = [
     optimal: 4,
   },
   {
+    id: 'stepping-stones',
+    name: 'Stepping Stones',
+    blurb: 'Just two blockers — plan a little chain of glides.',
+    spec: glideSpec([68, 21, 19, 66, 99, 73, 79, 14], 37),
+    state: [
+      { piece: 'hero', index: 44 },
+      { piece: 'dot', index: 34 },
+      { piece: 'vbar3', index: 31 },
+    ],
+    optimal: 5,
+  },
+  {
     id: 'runway',
     name: 'Runway',
     spec: glideSpec([13, 61, 22, 54, 103, 87, 33], 50),
@@ -77,6 +89,18 @@ export const GLIDE_LEVELS: GlideLevelDef[] = [
       { piece: 'vbar3', index: 74 },
     ],
     optimal: 5,
+  },
+  {
+    id: 'clockwork',
+    name: 'Clockwork',
+    blurb: 'Two dots, five walls, six moves. Everything has its place.',
+    spec: glideSpec([67, 66, 52, 26, 49], 19),
+    state: [
+      { piece: 'hero', index: 88 },
+      { piece: 'dot', index: 37 },
+      { piece: 'dot', index: 81 },
+    ],
+    optimal: 6,
   },
   {
     id: 'detour',

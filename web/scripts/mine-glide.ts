@@ -13,10 +13,10 @@ interface Tier {
 }
 
 const TIERS: Tier[] = [
+  { blockers: 2, minOptimal: 4, maxOptimal: 6, want: 4 }, // "bridge" levels: clean boards that teach chaining
   { blockers: 3, minOptimal: 4, maxOptimal: 5, want: 3 },
   { blockers: 4, minOptimal: 6, maxOptimal: 7, want: 3 },
   { blockers: 5, minOptimal: 8, maxOptimal: 10, want: 3 },
-  { blockers: 6, minOptimal: 11, maxOptimal: 20, want: 3 },
 ];
 
 for (const tier of TIERS) {
