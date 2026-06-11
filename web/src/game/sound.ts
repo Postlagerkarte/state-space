@@ -106,6 +106,39 @@ export function blocked(): void {
   osc.stop(t + 0.08);
 }
 
+// Major pentatonic over two octaves: any sequence of these sounds musical,
+// which is the point — optimal play should literally be a melody.
+const PENTATONIC = [0, 2, 4, 7, 9, 12, 14, 16, 19, 21, 24];
+const MELODY_ROOT = 293.66; // D4
+
+/**
+ * One step of the progress melody. `step` is how close the hero is to the goal
+ * (1 = first step of progress, par = the final note before the win resolves).
+ */
+export function melodyNote(step: number): void {
+  const c = ensure();
+  if (!c) return;
+  const idx = Math.min(PENTATONIC.length - 1, Math.max(0, step - 1));
+  const freq = MELODY_ROOT * Math.pow(2, PENTATONIC[idx] / 12);
+  const t = c.currentTime;
+  const voices: ReadonlyArray<readonly [number, number]> = [
+    [1, 0.2], // fundamental
+    [2, 0.05], // octave shimmer
+  ];
+  for (const [mult, peak] of voices) {
+    const osc = c.createOscillator();
+    osc.type = 'triangle';
+    osc.frequency.value = freq * mult;
+    const gain = c.createGain();
+    gain.gain.setValueAtTime(0.001, t);
+    gain.gain.exponentialRampToValueAtTime(peak, t + 0.015);
+    gain.gain.exponentialRampToValueAtTime(0.001, t + 0.5);
+    osc.connect(gain).connect(c.destination);
+    osc.start(t);
+    osc.stop(t + 0.55);
+  }
+}
+
 /** Tiny victory arpeggio. */
 export function winJingle(): void {
   const c = ensure();

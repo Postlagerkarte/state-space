@@ -9,9 +9,39 @@ export interface GlideLevelDef {
   spec: GlideSpec;
   state: GState;
   optimal: number;
+  blurb?: string;
 }
 
 export const GLIDE_LEVELS: GlideLevelDef[] = [
+  // -- hand-built tutorial ramp: each level teaches exactly one idea ----------
+  {
+    id: 'first-glide',
+    name: 'First Glide',
+    blurb: 'Drag the gold block toward the glowing pad. It slides until it hits something.',
+    spec: glideSpec([], 57),
+    state: [{ piece: 'hero', index: 49 }],
+    optimal: 1,
+  },
+  {
+    id: 'round-the-bend',
+    name: 'Round the Bend',
+    blurb: 'No straight line this time — go around the corner in two glides.',
+    spec: glideSpec([18, 101], 76),
+    state: [{ piece: 'hero', index: 13 }],
+    optimal: 2,
+  },
+  {
+    id: 'build-a-backstop',
+    name: 'Build a Backstop',
+    blurb: 'Sliding right overshoots the pad! Park the teal dot first so it stops you in place.',
+    spec: glideSpec([], 20),
+    state: [
+      { piece: 'hero', index: 13 },
+      { piece: 'dot', index: 65 },
+    ],
+    optimal: 3,
+  },
+  // -- mined campaign ---------------------------------------------------------
   {
     id: 'touchdown',
     name: 'Touchdown',

@@ -394,11 +394,61 @@ input[type='range'] {
 }
 
 .overlay-card .stars {
-  font-size: 40px;
+  font-size: 44px;
   letter-spacing: 10px;
   color: var(--gold);
   text-shadow: 0 0 22px rgba(255, 183, 3, 0.6);
   margin-bottom: 6px;
+  min-height: 56px;
+}
+
+.overlay-card .star {
+  display: inline-block;
+  opacity: 0;
+  animation: starpop 0.5s cubic-bezier(0.2, 2.2, 0.45, 1) both;
+}
+
+.overlay-card .star.empty {
+  color: rgba(255, 255, 255, 0.22);
+  text-shadow: none;
+}
+
+@keyframes starpop {
+  from {
+    transform: scale(2.8) rotate(-18deg);
+    opacity: 0;
+  }
+  to {
+    transform: scale(1) rotate(0);
+    opacity: 1;
+  }
+}
+
+.toast {
+  position: absolute;
+  left: 50%;
+  bottom: 18px;
+  transform: translateX(-50%);
+  z-index: 4;
+  background: rgba(38, 18, 24, 0.92);
+  border: 1px solid rgba(255, 77, 109, 0.45);
+  border-radius: 12px;
+  padding: 9px 16px;
+  font-size: 13px;
+  color: #ffd9e0;
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.45);
+}
+
+.btn-link {
+  appearance: none;
+  border: 0;
+  background: none;
+  color: var(--gold);
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+  text-decoration: underline;
+  padding: 0;
 }
 
 .btnrow.center {

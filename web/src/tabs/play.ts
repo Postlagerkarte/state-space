@@ -25,6 +25,9 @@ export function createPlayTab(): TabController {
             </div>
           </div>
         </div>
+        <div class="toast" data-toast hidden>
+          ⚠ No path to the goal from here — <button class="btn-link" data-toast-undo>undo</button>
+        </div>
       </div>
       <aside class="side">
         <div class="panel" data-picker></div>
@@ -65,6 +68,8 @@ export function createPlayTab(): TabController {
   const picker = new GlidePicker();
   root.querySelector('[data-picker]')!.appendChild(picker.root);
 
+  const toast = root.querySelector<HTMLElement>('[data-toast]')!;
+
   let board: BoardView | null = null;
   let level: PickedLevel | null = null;
   let current: GState = [];
@@ -72,6 +77,35 @@ export function createPlayTab(): TabController {
   let selected = -1;
   let hintsUsed = false;
   let solvedShown = false;
+
+  // The melody mechanic: after each move a background BFS recomputes the true
+  // distance to the goal. Moves that bring the hero closer play the next note
+  // of an ascending pentatonic ladder — optimal play is literally a tune.
+  // The same solver result powers the "this position is dead" toast.
+  let distSolver: Solver<GState, GMove> | null = null;
+  let prevDist: number | null = null;
+  let baseDist = 0;
+  let impactAt = 0; // wall-clock ms when the current glide lands (for note timing)
+
+  function startDistCheck(): void {
+    if (!level) return;
+    distSolver = new Solver(glideRules(level.spec), gCloneState(current), 'bfs');
+  }
+
+  function handleDistance(d: number): void {
+    if (!Number.isFinite(d)) {
+      toast.hidden = false;
+      prevDist = Infinity;
+      return;
+    }
+    toast.hidden = true;
+    if (prevDist !== null && d < prevDist && !solvedShown) {
+      const note = Math.max(1, baseDist - d);
+      const delay = Math.max(0, impactAt - performance.now() + 90);
+      setTimeout(() => sound.melodyNote(note), delay);
+    }
+    prevDist = d;
+  }
 
   function updateMoves(): void {
     movesEl.textContent = String(history.length - 1);
@@ -157,6 +191,10 @@ export function createPlayTab(): TabController {
     hintsUsed = false;
     solvedShown = false;
     overlay.hidden = true;
+    toast.hidden = true;
+    distSolver = null;
+    baseDist = lvl.optimal;
+    prevDist = lvl.optimal;
     board.setLevel(current);
     parEl.textContent = String(lvl.optimal);
     updateMoves();
@@ -173,19 +211,26 @@ export function createPlayTab(): TabController {
     current = slid.state;
     history.push(gCloneState(current));
     board.clearHint();
+    toast.hidden = true;
     const dur = board.applyState(current);
     sound.whoosh(slid.dist);
     const bv = board;
+    impactAt = performance.now() + dur * 1000;
     setTimeout(() => sound.thunk(Math.min(1, slid.dist / 6)), Math.max(0, dur * 1000 - 40));
     updateMoves();
 
     if (gIsSolved(level.spec, current)) {
       solvedShown = true;
+      distSolver = null;
+      // the melody's top note lands with the final impact, then resolves
+      setTimeout(() => sound.melodyNote(baseDist), Math.max(0, dur * 1000 - 10));
       setTimeout(() => {
         bv.celebrate();
         sound.winJingle();
-        showWin();
-      }, dur * 1000 + 120);
+      }, dur * 1000 + 140);
+      setTimeout(() => showWin(), dur * 1000 + 750);
+    } else {
+      startDistCheck();
     }
   }
 
@@ -194,10 +239,19 @@ export function createPlayTab(): TabController {
     const moves = history.length - 1;
     let stars = moves <= level.optimal ? 3 : moves <= level.optimal + 2 ? 2 : 1;
     if (hintsUsed && stars > 2) stars = 2;
-    starsEl.textContent = '★'.repeat(stars) + '☆'.repeat(3 - stars);
+    starsEl.innerHTML = [0, 1, 2]
+      .map((i) => {
+        const filled = i < stars;
+        return `<span class="star ${filled ? '' : 'empty'}" style="animation-delay:${0.15 + i * 0.22}s">${filled ? '★' : '☆'}</span>`;
+      })
+      .join('');
+    for (let i = 0; i < stars; i++) {
+      setTimeout(() => sound.thunk(0.45 + i * 0.25), (0.15 + i * 0.22) * 1000 + 200);
+    }
     overlayTitle.textContent = stars === 3 ? 'Perfect!' : 'Level clear!';
     overlayText.textContent =
-      `${moves} moves · par ${level.optimal}` + (hintsUsed ? ' · hint used' : '');
+      `${moves} ${moves === 1 ? 'move' : 'moves'} · par ${level.optimal}` +
+      (hintsUsed ? ' · hint used' : '');
     if (level.id !== 'random') {
       setStars(level.id, stars);
       picker.refresh();
@@ -210,8 +264,12 @@ export function createPlayTab(): TabController {
     history.pop();
     current = gCloneState(history[history.length - 1]);
     board.clearHint();
+    toast.hidden = true;
     board.applyState(current);
     updateMoves();
+    // recompute the distance silently so the melody baseline stays honest
+    prevDist = null;
+    startDistCheck();
   }
 
   function hint(): void {
@@ -236,6 +294,7 @@ export function createPlayTab(): TabController {
   }
 
   picker.onLevel = loadLevel;
+  root.querySelector('[data-toast-undo]')!.addEventListener('click', undo);
   root.querySelector('[data-undo]')!.addEventListener('click', undo);
   root.querySelector('[data-hint]')!.addEventListener('click', hint);
   root.querySelector('[data-reset]')!.addEventListener('click', reset);
@@ -269,6 +328,25 @@ export function createPlayTab(): TabController {
 
   function tick(dt: number): void {
     picker.tick();
+
+    // pump the background distance solver a few thousand expansions per frame
+    if (distSolver) {
+      let n = 4000;
+      while (n-- > 0 && !distSolver.done && distSolver.stats.explored < 150_000) {
+        distSolver.step();
+      }
+      if (distSolver.done) {
+        const d =
+          distSolver.goalId !== null ? distSolver.nodes[distSolver.goalId].depth : Infinity;
+        distSolver = null;
+        handleDistance(d);
+      } else if (distSolver.stats.explored >= 150_000) {
+        // state space too large to judge — stay silent rather than guess
+        distSolver = null;
+        prevDist = null;
+      }
+    }
+
     board?.frame(dt);
   }
 
