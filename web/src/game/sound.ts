@@ -153,6 +153,13 @@ export function swishBack(): void {
 const PENTATONIC = [0, 2, 4, 7, 9, 12, 14, 16, 19, 21, 24];
 const MELODY_ROOT = 293.66; // D4
 
+// Rush mode shifts the whole melody up a key per combo level — heat = pitch.
+let melodyKeySemis = 0;
+
+export function setMelodyKey(semitones: number): void {
+  melodyKeySemis = semitones;
+}
+
 /**
  * One step of the progress melody. `step` is how close the hero is to the goal
  * (1 = first step of progress, par = the final note before the win resolves).
@@ -161,7 +168,7 @@ export function melodyNote(step: number): void {
   const c = ensure();
   if (!c) return;
   const idx = Math.min(PENTATONIC.length - 1, Math.max(0, step - 1));
-  const freq = MELODY_ROOT * Math.pow(2, PENTATONIC[idx] / 12);
+  const freq = MELODY_ROOT * Math.pow(2, (PENTATONIC[idx] + melodyKeySemis) / 12);
   const t = c.currentTime;
   const voices: ReadonlyArray<readonly [number, number]> = [
     [1, 0.2], // fundamental
@@ -179,6 +186,84 @@ export function melodyNote(step: number): void {
     osc.start(t);
     osc.stop(t + 0.55);
   }
+}
+
+/** Urgent clock tick for the last seconds of a rush run. */
+export function tickTock(): void {
+  const c = ensure();
+  if (!c) return;
+  const t = c.currentTime;
+  const osc = c.createOscillator();
+  osc.type = 'sine';
+  osc.frequency.setValueAtTime(880, t);
+  osc.frequency.exponentialRampToValueAtTime(660, t + 0.04);
+  const gain = c.createGain();
+  gain.gain.setValueAtTime(0.12, t);
+  gain.gain.exponentialRampToValueAtTime(0.001, t + 0.06);
+  osc.connect(gain).connect(c.destination);
+  osc.start(t);
+  osc.stop(t + 0.07);
+}
+
+/** Quick rising zip when the combo multiplier climbs. */
+export function comboUp(combo: number): void {
+  const c = ensure();
+  if (!c) return;
+  const base = 392 * Math.pow(2, Math.min(combo, 8) / 12);
+  for (let i = 0; i < 2; i++) {
+    const t = c.currentTime + i * 0.06;
+    const osc = c.createOscillator();
+    osc.type = 'triangle';
+    osc.frequency.value = base * (i === 0 ? 1 : 1.5);
+    const gain = c.createGain();
+    gain.gain.setValueAtTime(0.001, t);
+    gain.gain.exponentialRampToValueAtTime(0.14, t + 0.015);
+    gain.gain.exponentialRampToValueAtTime(0.001, t + 0.16);
+    osc.connect(gain).connect(c.destination);
+    osc.start(t);
+    osc.stop(t + 0.18);
+  }
+}
+
+/** Gentle two-note sigh when a streak breaks. */
+export function comboBreak(): void {
+  const c = ensure();
+  if (!c) return;
+  for (const [offset, freq] of [
+    [0, 330],
+    [0.09, 277],
+  ] as const) {
+    const t = c.currentTime + offset;
+    const osc = c.createOscillator();
+    osc.type = 'triangle';
+    osc.frequency.value = freq;
+    const gain = c.createGain();
+    gain.gain.setValueAtTime(0.08, t);
+    gain.gain.exponentialRampToValueAtTime(0.001, t + 0.16);
+    osc.connect(gain).connect(c.destination);
+    osc.start(t);
+    osc.stop(t + 0.18);
+  }
+}
+
+/** Descending womp for the end of a run. */
+export function gameOver(): void {
+  const c = ensure();
+  if (!c) return;
+  const notes = [392, 311, 233, 196];
+  notes.forEach((freq, i) => {
+    const t = c.currentTime + i * 0.16;
+    const osc = c.createOscillator();
+    osc.type = 'triangle';
+    osc.frequency.value = freq;
+    const gain = c.createGain();
+    gain.gain.setValueAtTime(0.001, t);
+    gain.gain.exponentialRampToValueAtTime(0.16, t + 0.02);
+    gain.gain.exponentialRampToValueAtTime(0.001, t + 0.4);
+    osc.connect(gain).connect(c.destination);
+    osc.start(t);
+    osc.stop(t + 0.45);
+  });
 }
 
 /** Tiny victory arpeggio. */

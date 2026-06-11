@@ -21,7 +21,7 @@ const browser = await puppeteer.launch({
 try {
   const page = await browser.newPage();
   page.on('pageerror', (err) => console.error('PAGE ERROR:', String(err)));
-  await page.goto('http://localhost:5173/', { waitUntil: 'load' });
+  await page.goto('http://localhost:5173/?tab=play', { waitUntil: 'load' });
   await page.waitForSelector('.tab-play canvas');
   await sleep(1500); // level load, board build, first frames
 

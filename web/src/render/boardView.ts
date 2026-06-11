@@ -90,6 +90,8 @@ export class BoardView {
   private pieceGroups: THREE.Group[] = [];
   private goalMaterials: THREE.MeshStandardMaterial[] = [];
   private state: ViewState | null = null;
+  private staticGroup: THREE.Group | null = null;
+  private staticDisposables: { dispose(): void }[] = [];
 
   private slides: SlideTween[] = [];
   private scales: ScaleTween[] = [];
@@ -205,20 +207,29 @@ export class BoardView {
   }
 
   private buildStaticBoard(): void {
+    if (this.staticGroup) {
+      this.scene.remove(this.staticGroup);
+      for (const d of this.staticDisposables) d.dispose();
+    }
+    this.staticGroup = new THREE.Group();
+    this.staticDisposables = [];
+    this.goalMaterials = [];
+
     const { width, height, walls, goalCells } = this.layout;
-    const base = new THREE.Mesh(
-      new THREE.BoxGeometry(width + 0.7, 0.4, height + 0.7),
-      new THREE.MeshStandardMaterial({ color: 0x11151f, roughness: 1 }),
-    );
+    const baseGeo = new THREE.BoxGeometry(width + 0.7, 0.4, height + 0.7);
+    const baseMat = new THREE.MeshStandardMaterial({ color: 0x11151f, roughness: 1 });
+    const base = new THREE.Mesh(baseGeo, baseMat);
     base.position.y = -0.21;
     base.receiveShadow = true;
-    this.scene.add(base);
+    this.staticGroup.add(base);
+    this.staticDisposables.push(baseGeo, baseMat);
 
     const wallSet = new Set(walls);
     const goalSet = new Set(goalCells);
     const tileGeo = new THREE.BoxGeometry(0.94, 0.1, 0.94);
     const tileMat = new THREE.MeshStandardMaterial({ color: 0x1b2233, roughness: 0.95 });
     const wallMat = new THREE.MeshStandardMaterial({ color: 0x39415a, roughness: 0.9 });
+    this.staticDisposables.push(tileGeo, tileMat, wallMat);
 
     for (let cell = 0; cell < width * height; cell++) {
       if (wallSet.has(cell)) {
@@ -229,7 +240,7 @@ export class BoardView {
         wall.position.set(this.cellX(cell), 0.45 * h, this.cellZ(cell));
         wall.castShadow = true;
         wall.receiveShadow = true;
-        this.scene.add(wall);
+        this.staticGroup.add(wall);
       } else {
         const isGoal = goalSet.has(cell);
         const mat = isGoal
@@ -240,13 +251,39 @@ export class BoardView {
               emissiveIntensity: 0.35,
             })
           : tileMat;
+        if (isGoal) this.staticDisposables.push(mat);
         const tile = new THREE.Mesh(tileGeo, mat);
         tile.position.set(this.cellX(cell), 0.0, this.cellZ(cell));
         tile.receiveShadow = true;
-        this.scene.add(tile);
+        this.staticGroup.add(tile);
         if (isGoal) this.goalMaterials.push(mat as THREE.MeshStandardMaterial);
       }
     }
+    this.scene.add(this.staticGroup);
+  }
+
+  /** Swap to a different board layout (walls/goal) without rebuilding the renderer. */
+  setLayout(layout: BoardLayout): void {
+    this.layout = layout;
+    this.buildStaticBoard();
+  }
+
+  /**
+   * Snappy board swap for rush mode: pieces pop out, the layout swaps,
+   * the new pieces pop in with a small stagger.
+   */
+  transitionTo(state: ViewState, layout?: BoardLayout): void {
+    for (const g of this.pieceGroups) {
+      this.scales.push({ group: g, from: g.scale.x, to: 0.01, t: 0, dur: 0.15 });
+    }
+    window.setTimeout(() => {
+      if (layout) this.setLayout(layout);
+      this.setLevel(state);
+      this.pieceGroups.forEach((g, i) => {
+        g.scale.setScalar(0.01);
+        this.scales.push({ group: g, from: 0.01, to: 1, t: -i * 0.04, dur: 0.2 });
+      });
+    }, 160);
   }
 
   private buildPieceMeshes(group: THREE.Group, p: ViewPlacement, pieceIdx: number): void {
@@ -421,15 +458,20 @@ export class BoardView {
     }
   }
 
-  celebrate(): void {
+  celebrate(intensity: 'full' | 'quick' = 'full'): void {
     this.celebrateT = 0;
     const [cx, cz] = this.goalCenter();
     this.spawnRing(cx, cz);
-    this.spawnFirework(cx, cz, 170, 7, 1.6);
-    this.celebrateEvents = [
-      { at: 0.22, fn: () => this.spawnFirework(cx, cz, 90, 5, 1.3) },
-      { at: 0.5, fn: () => { this.spawnRing(cx, cz); this.spawnFirework(cx, cz, 70, 4, 1.1); } },
-    ];
+    if (intensity === 'quick') {
+      this.spawnFirework(cx, cz, 90, 6, 1.1);
+      this.celebrateEvents = [];
+    } else {
+      this.spawnFirework(cx, cz, 170, 7, 1.6);
+      this.celebrateEvents = [
+        { at: 0.22, fn: () => this.spawnFirework(cx, cz, 90, 5, 1.3) },
+        { at: 0.5, fn: () => { this.spawnRing(cx, cz); this.spawnFirework(cx, cz, 70, 4, 1.1); } },
+      ];
+    }
     if (this.pieceGroups[0]) this.spins.push({ group: this.pieceGroups[0], t: 0 });
   }
 
@@ -874,7 +916,8 @@ export class BoardView {
     for (let i = this.scales.length - 1; i >= 0; i--) {
       const tw = this.scales[i];
       tw.t += dt;
-      const k = easeOutCubic(Math.min(1, tw.t / tw.dur));
+      // negative t acts as a start delay (used for staggered pop-ins)
+      const k = easeOutCubic(Math.min(1, Math.max(0, tw.t / tw.dur)));
       tw.group.scale.setScalar(tw.from + (tw.to - tw.from) * k);
       if (tw.t >= tw.dur) {
         this.scales.splice(i, 1);

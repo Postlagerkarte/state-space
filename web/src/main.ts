@@ -1,5 +1,6 @@
 import './style.css';
 import { TabController } from './ui/dom';
+import { createRushTab } from './tabs/rush';
 import { createPlayTab } from './tabs/play';
 import { createWatchTab } from './tabs/watch';
 import { createRaceTab } from './tabs/race';
@@ -11,7 +12,8 @@ interface TabSpec {
 }
 
 const TABS: TabSpec[] = [
-  { id: 'play', label: 'Play', make: createPlayTab },
+  { id: 'rush', label: '⚡ Rush', make: createRushTab },
+  { id: 'play', label: '🧘 Zen', make: createPlayTab },
   { id: 'watch', label: 'Watch', make: createWatchTab },
   { id: 'race', label: 'Race', make: createRaceTab },
 ];
@@ -70,7 +72,13 @@ for (const spec of TABS) {
   nav.appendChild(btn);
 }
 
+// tabs can request a switch (e.g. rush's "practice in Zen" button)
+main.addEventListener('switch-tab', (e) => {
+  const id = (e as CustomEvent<string>).detail;
+  if (TABS.some((t) => t.id === id)) switchTo(id);
+});
+
 // deep links: ?tab=watch opens a tab directly, ?run=1 starts its search immediately
 const params = new URLSearchParams(location.search);
-const requested = params.get('tab') ?? 'play';
-switchTo(TABS.some((t) => t.id === requested) ? requested : 'play');
+const requested = params.get('tab') ?? 'rush';
+switchTo(TABS.some((t) => t.id === requested) ? requested : 'rush');

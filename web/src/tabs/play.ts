@@ -42,10 +42,10 @@ export function createPlayTab(): TabController {
             <button class="btn" data-reset>Reset</button>
             <button class="btn" data-mute title="Toggle sound"></button>
           </div>
-          <p class="hint"><b>Hover a piece</b> to see every spot it can glide to —
-          click a ghost (or drag the piece) to make the move. Park the
-          <b class="gold">gold block</b> so it covers the glowing pad exactly;
-          a <b class="gold">pulsing gold ghost</b> means you're one move from winning.</p>
+          <p class="hint"><b>Drag a piece</b> — it glides until it hits something.
+          Stuck? Pause for a moment and hover a piece: ghosts show every spot it
+          can glide to (click one to move). A <b class="gold">pulsing gold ghost</b>
+          means you're one move from winning.</p>
         </div>
         <div class="panel note">
           Par is computed live by breadth-first search — every level you play is a
@@ -120,17 +120,31 @@ export function createPlayTab(): TabController {
   // Hovering or selecting a piece shows ghost copies at every spot it can glide
   // to (clickable). This is what makes harder boards readable: the possibility
   // space becomes visible instead of something you must imagine.
+  //
+  // The ghosts are gated behind a short stretch of inactivity so they assist
+  // when you're stuck without spoiling the levels you can read yourself.
+  // Training levels (par <= 3) keep them always on.
 
   let hoverIdx = -1;
+  let previewsShown = false;
+  let lastMoveAt = 0;
+
+  function previewGateOpen(): boolean {
+    if (!level) return false;
+    if (level.optimal <= 3) return true;
+    return performance.now() - lastMoveAt > 2500;
+  }
 
   function refreshPreviews(): void {
-    if (!board || !level || solvedShown) {
+    if (!board || !level || solvedShown || !previewGateOpen()) {
       board?.clearPreviews();
+      previewsShown = false;
       return;
     }
     const idx = hoverIdx >= 0 ? hoverIdx : selected;
     if (idx < 0 || idx >= current.length) {
       board.clearPreviews();
+      previewsShown = false;
       return;
     }
     const specs = [];
@@ -147,6 +161,7 @@ export function createPlayTab(): TabController {
       });
     }
     board.showPreviews(specs, current[idx].index);
+    previewsShown = true;
   }
 
   // -- drag-to-glide input ---------------------------------------------------
@@ -245,6 +260,7 @@ export function createPlayTab(): TabController {
     history = [gCloneState(lvl.state)];
     selected = -1;
     hoverIdx = -1;
+    lastMoveAt = performance.now();
     hintsUsed = false;
     solvedShown = false;
     overlay.hidden = true;
@@ -267,6 +283,7 @@ export function createPlayTab(): TabController {
     }
     current = slid.state;
     history.push(gCloneState(current));
+    lastMoveAt = performance.now();
     board.clearHintRun();
     toast.hidden = true;
     const dur = board.applyState(current);
@@ -322,6 +339,7 @@ export function createPlayTab(): TabController {
     if (history.length < 2 || solvedShown || !board) return;
     history.pop();
     current = gCloneState(history[history.length - 1]);
+    lastMoveAt = performance.now();
     board.clearHintRun();
     toast.hidden = true;
     board.applyState(current);
@@ -347,6 +365,7 @@ export function createPlayTab(): TabController {
     hintsUsed = true;
     selected = move.pieceIdx;
     hoverIdx = -1;
+    lastMoveAt = 0; // asking for a hint opens the preview gate immediately
     board.setSelected(selected);
     refreshPreviews();
     // a ghost of the piece glides the optimal path so the move's shape is visible
@@ -393,6 +412,11 @@ export function createPlayTab(): TabController {
 
   function tick(dt: number): void {
     picker.tick();
+
+    // ghosts appear once the inactivity gate opens (instant on training levels)
+    if (!previewsShown && previewGateOpen() && (hoverIdx >= 0 || selected >= 0) && !solvedShown) {
+      refreshPreviews();
+    }
 
     // pump the background distance solver a few thousand expansions per frame
     if (distSolver) {

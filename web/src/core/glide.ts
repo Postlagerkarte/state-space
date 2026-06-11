@@ -245,6 +245,15 @@ export class GlideLevelSearch {
     return null;
   }
 
+  /** Synchronous convenience for scripts and warmup boards. */
+  runSync(maxAttempts: number): GlideLevel | null {
+    while (this.attempts < maxAttempts) {
+      const level = this.tick(50);
+      if (level) return level;
+    }
+    return null;
+  }
+
   private attempt(): GlideLevel | null {
     this.attempts++;
     const rng = this.rng;
