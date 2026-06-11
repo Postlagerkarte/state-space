@@ -1,14 +1,14 @@
-// Play tab: solve the puzzle yourself, then compare against the BFS optimum.
+// Play tab — glide rules: drag a piece and it flies until it hits something.
+// Park the gold block exactly on the glowing pad. Par comes from the BFS
+// solver; stars reward matching it.
 
 import { BoardView } from '../render/boardView';
-import { LevelPicker } from '../ui/levelPicker';
-import { el, fmt, TabController } from '../ui/dom';
-import { State, Placement, cloneState, isValidState, isSolved } from '../core/board';
-import { pieceDef } from '../core/pieces';
+import { glideLayout } from '../render/layouts';
+import { el, TabController } from '../ui/dom';
+import { GlidePicker, PickedLevel, setStars } from '../ui/glidePicker';
+import { GMove, GState, gCloneState, gIsSolved, glideMove, glideRules } from '../core/glide';
 import { Solver } from '../core/solver';
-import { LEVELS } from '../core/levels';
-
-const OPTIMAL_CAP = 400_000;
+import * as sound from '../game/sound';
 
 export function createPlayTab(): TabController {
   const root = el(`
@@ -16,9 +16,13 @@ export function createPlayTab(): TabController {
       <div class="canvas-host" data-board>
         <div class="overlay" data-overlay hidden>
           <div class="overlay-card">
-            <h2 data-overlay-title>Solved!</h2>
+            <div class="stars" data-stars></div>
+            <h2 data-overlay-title>Level clear!</h2>
             <p data-overlay-text></p>
-            <button class="btn primary" data-overlay-close>Keep exploring</button>
+            <div class="btnrow center">
+              <button class="btn" data-replay>Replay</button>
+              <button class="btn primary" data-next>Next level</button>
+            </div>
           </div>
         </div>
       </div>
@@ -26,28 +30,24 @@ export function createPlayTab(): TabController {
         <div class="panel" data-picker></div>
         <div class="panel stats-row">
           <div><span class="stat-label">Your moves</span><span class="stat-value" data-moves>0</span></div>
-          <div><span class="stat-label">Optimal</span><span class="stat-value" data-optimal>…</span></div>
+          <div><span class="stat-label">Par</span><span class="stat-value" data-par>—</span></div>
         </div>
         <div class="panel">
           <div class="btnrow">
+            <button class="btn" data-undo title="Undo (Ctrl+Z)">↶ Undo</button>
+            <button class="btn" data-hint title="Show the next optimal move">💡 Hint</button>
             <button class="btn" data-reset>Reset</button>
-            <button class="btn primary" data-solve>Show optimal</button>
+            <button class="btn" data-mute title="Toggle sound"></button>
           </div>
-          <div class="dpad">
-            <span></span><button class="btn dir" data-dir="-8">▲</button><span></span>
-            <button class="btn dir" data-dir="-1">◀</button>
-            <button class="btn dir rotate" data-rotate title="Rotate (R)">⟳</button>
-            <button class="btn dir" data-dir="1">▶</button>
-            <span></span><button class="btn dir" data-dir="8">▼</button><span></span>
-          </div>
-          <p class="hint">Click a piece to select it, then slide with the arrows or arrow keys.
-          Bring the <b class="gold">gold block</b> to the glowing corner. ⟳ / R rotates a piece
-          (when rotation is enabled).</p>
+          <p class="hint"><b>Drag a piece</b> — it glides until it hits something.
+          Park the <b class="gold">gold block</b> so it covers the glowing pad exactly;
+          if nothing stops it there, it flies right past. Arrow keys move the
+          selected piece.</p>
         </div>
         <div class="panel note">
-          Every move you make is one <b>edge</b> in a giant graph of board states.
-          “Show optimal” runs breadth-first search over that graph — switch to
-          the <b>Watch</b> tab to see it happen.
+          Par is computed live by breadth-first search — every level you play is a
+          state-space the solver has already conquered. Watch it work in the
+          <b>Watch</b> tab.
         </div>
       </aside>
     </section>
@@ -57,141 +57,210 @@ export function createPlayTab(): TabController {
   const overlay = root.querySelector<HTMLElement>('[data-overlay]')!;
   const overlayTitle = root.querySelector<HTMLElement>('[data-overlay-title]')!;
   const overlayText = root.querySelector<HTMLElement>('[data-overlay-text]')!;
+  const starsEl = root.querySelector<HTMLElement>('[data-stars]')!;
   const movesEl = root.querySelector<HTMLElement>('[data-moves]')!;
-  const optimalEl = root.querySelector<HTMLElement>('[data-optimal]')!;
+  const parEl = root.querySelector<HTMLElement>('[data-par]')!;
+  const muteBtn = root.querySelector<HTMLButtonElement>('[data-mute]')!;
 
-  const picker = new LevelPicker({ defaultId: 'first-steps' });
+  const picker = new GlidePicker();
   root.querySelector('[data-picker]')!.appendChild(picker.root);
 
   let board: BoardView | null = null;
-  let levelState: State = cloneState(LEVELS[0].state);
-  let current: State = cloneState(levelState);
-  let moves = 0;
+  let level: PickedLevel | null = null;
+  let current: GState = [];
+  let history: GState[] = [];
   let selected = -1;
+  let hintsUsed = false;
   let solvedShown = false;
 
-  let optimalSolver: Solver | null = null;
-  let optimal: number | null = null;
-
-  let playbackSolver: Solver | null = null;
-  let playback: State[] | null = null;
-  let playbackStep = 0;
-  let playbackClock = 0;
-
-  function updateStats(): void {
-    movesEl.textContent = String(moves);
-    optimalEl.textContent =
-      optimal !== null ? String(optimal) : optimalSolver ? '…' : '—';
+  function updateMoves(): void {
+    movesEl.textContent = String(history.length - 1);
   }
 
-  function recomputeOptimal(): void {
-    optimal = null;
-    optimalSolver = new Solver(cloneState(levelState), 'bfs', picker.rotation);
-    updateStats();
+  function updateMuteLabel(): void {
+    muteBtn.textContent = sound.isMuted() ? '🔇' : '🔊';
+  }
+  updateMuteLabel();
+
+  // -- drag-to-glide input ---------------------------------------------------
+
+  let drag: { pieceIdx: number; x: number; y: number; committed: boolean } | null = null;
+
+  function attachPointer(bv: BoardView): void {
+    const canvas = bv.domElement;
+    // capture phase so we can disable orbiting before OrbitControls sees the event
+    canvas.addEventListener(
+      'pointerdown',
+      (e) => {
+        const idx = bv.pickAt(e.clientX, e.clientY);
+        if (idx === null) {
+          selected = -1;
+          bv.setSelected(-1);
+          return;
+        }
+        selected = idx;
+        bv.setSelected(idx);
+        drag = { pieceIdx: idx, x: e.clientX, y: e.clientY, committed: false };
+        bv.setOrbitEnabled(false);
+        canvas.setPointerCapture(e.pointerId);
+      },
+      { capture: true },
+    );
+    canvas.addEventListener('pointermove', (e) => {
+      if (!drag || drag.committed) return;
+      const dx = e.clientX - drag.x;
+      const dy = e.clientY - drag.y;
+      if (Math.hypot(dx, dy) < 22) return;
+      // map the screen-space drag onto the board axes (works at any camera angle)
+      const axes = bv.screenAxes();
+      const candidates: [number, number, { x: number; y: number }][] = [
+        [0, 1, axes.x],
+        [0, -1, { x: -axes.x.x, y: -axes.x.y }],
+        [1, 0, axes.z],
+        [-1, 0, { x: -axes.z.x, y: -axes.z.y }],
+      ];
+      let bestDr = 0;
+      let bestDc = 1;
+      let bestDot = -Infinity;
+      for (const [dr, dc, v] of candidates) {
+        const len = Math.hypot(v.x, v.y) || 1;
+        const dot = (dx * v.x + dy * v.y) / len;
+        if (dot > bestDot) {
+          bestDot = dot;
+          bestDr = dr;
+          bestDc = dc;
+        }
+      }
+      drag.committed = true;
+      tryGlide(drag.pieceIdx, bestDr, bestDc);
+    });
+    const release = () => {
+      if (drag) {
+        drag = null;
+        bv.setOrbitEnabled(true);
+      }
+    };
+    canvas.addEventListener('pointerup', release);
+    canvas.addEventListener('pointercancel', release);
   }
 
-  function reset(): void {
-    current = cloneState(levelState);
-    moves = 0;
+  // -- game logic --------------------------------------------------------------
+
+  function loadLevel(lvl: PickedLevel): void {
+    level = lvl;
+    board?.dispose();
+    board = new BoardView(boardHost, glideLayout(lvl.spec), { interactive: true });
+    attachPointer(board);
+    current = gCloneState(lvl.state);
+    history = [gCloneState(lvl.state)];
     selected = -1;
+    hintsUsed = false;
     solvedShown = false;
-    playback = null;
-    playbackSolver = null;
     overlay.hidden = true;
-    board?.setLevel(current);
-    updateStats();
+    board.setLevel(current);
+    parEl.textContent = String(lvl.optimal);
+    updateMoves();
   }
 
-  picker.onLevel = (state) => {
-    levelState = state;
-    reset();
-    recomputeOptimal();
-  };
-  picker.onRotationChange = () => recomputeOptimal();
+  function tryGlide(pieceIdx: number, dr: number, dc: number): void {
+    if (!level || !board || solvedShown) return;
+    const slid = glideMove(level.spec, current, pieceIdx, dr, dc);
+    if (!slid) {
+      board.pulseInvalid(pieceIdx);
+      sound.blocked();
+      return;
+    }
+    current = slid.state;
+    history.push(gCloneState(current));
+    board.clearHint();
+    const dur = board.applyState(current);
+    sound.whoosh(slid.dist);
+    const bv = board;
+    setTimeout(() => sound.thunk(Math.min(1, slid.dist / 6)), Math.max(0, dur * 1000 - 40));
+    updateMoves();
 
-  function win(watched: boolean): void {
-    if (solvedShown) return;
-    solvedShown = true;
-    board?.celebrate();
-    overlayTitle.textContent = watched ? 'That was the optimal run' : 'Solved! 🎉';
-    overlayText.textContent = watched
-      ? `Breadth-first search found this ${fmt(playbackStep)}-move solution — the shortest possible.`
-      : optimal !== null
-        ? `You did it in ${fmt(moves)} moves — the optimum is ${fmt(optimal)}.`
-        : `You did it in ${fmt(moves)} moves.`;
+    if (gIsSolved(level.spec, current)) {
+      solvedShown = true;
+      setTimeout(() => {
+        bv.celebrate();
+        sound.winJingle();
+        showWin();
+      }, dur * 1000 + 120);
+    }
+  }
+
+  function showWin(): void {
+    if (!level) return;
+    const moves = history.length - 1;
+    let stars = moves <= level.optimal ? 3 : moves <= level.optimal + 2 ? 2 : 1;
+    if (hintsUsed && stars > 2) stars = 2;
+    starsEl.textContent = '★'.repeat(stars) + '☆'.repeat(3 - stars);
+    overlayTitle.textContent = stars === 3 ? 'Perfect!' : 'Level clear!';
+    overlayText.textContent =
+      `${moves} moves · par ${level.optimal}` + (hintsUsed ? ' · hint used' : '');
+    if (level.id !== 'random') {
+      setStars(level.id, stars);
+      picker.refresh();
+    }
     overlay.hidden = false;
   }
 
-  function commit(next: State): void {
-    current = next;
-    moves++;
-    board?.applyState(current);
-    updateStats();
-    if (isSolved(current)) win(false);
+  function undo(): void {
+    if (history.length < 2 || solvedShown || !board) return;
+    history.pop();
+    current = gCloneState(history[history.length - 1]);
+    board.clearHint();
+    board.applyState(current);
+    updateMoves();
   }
 
-  function trySlide(delta: number): void {
-    if (selected < 0 || playback || playbackSolver) return;
-    const p = current[selected];
-    const next = current.slice();
-    next[selected] = { piece: p.piece, index: p.index + delta };
-    if (!isValidState(next)) {
-      board?.pulseInvalid(selected);
+  function hint(): void {
+    if (!level || !board || solvedShown) return;
+    const solver = new Solver(glideRules(level.spec), gCloneState(current), 'bfs');
+    solver.run(80_000);
+    const path = solver.path();
+    if (!path || path.length < 2) {
+      board.pulseInvalid(0);
+      sound.blocked();
       return;
     }
-    commit(next);
+    const move = path[1].move as GMove;
+    hintsUsed = true;
+    selected = move.pieceIdx;
+    board.setSelected(selected);
+    board.showHint(move.pieceIdx, move.dr, move.dc);
   }
 
-  function tryRotate(): void {
-    if (selected < 0 || playback || playbackSolver || !picker.rotation) return;
-    const p = current[selected];
-    const cycle = pieceDef(p.piece).cycle;
-    if (cycle.length < 2) {
-      board?.pulseInvalid(selected);
-      return;
-    }
-    const at = cycle.indexOf(p.piece);
-    for (let k = 1; k < cycle.length; k++) {
-      const name = cycle[(at + k) % cycle.length];
-      const next = current.slice();
-      next[selected] = { piece: name, index: p.index } as Placement;
-      if (isValidState(next)) {
-        commit(next);
-        return;
-      }
-    }
-    board?.pulseInvalid(selected);
+  function reset(): void {
+    if (level) loadLevel({ ...level, state: gCloneState(history[0]) });
   }
 
-  function showOptimal(): void {
-    if (playback || playbackSolver || isSolved(current)) return;
-    playbackSolver = new Solver(cloneState(current), 'bfs', picker.rotation);
-    selected = -1;
-    board?.setSelected(-1);
-  }
-
+  picker.onLevel = loadLevel;
+  root.querySelector('[data-undo]')!.addEventListener('click', undo);
+  root.querySelector('[data-hint]')!.addEventListener('click', hint);
   root.querySelector('[data-reset]')!.addEventListener('click', reset);
-  root.querySelector('[data-solve]')!.addEventListener('click', showOptimal);
-  root.querySelector('[data-overlay-close]')!.addEventListener('click', () => {
-    overlay.hidden = true;
+  muteBtn.addEventListener('click', () => {
+    sound.toggleMute();
+    updateMuteLabel();
   });
-  root.querySelectorAll<HTMLButtonElement>('[data-dir]').forEach((btn) => {
-    btn.addEventListener('click', () => trySlide(Number(btn.dataset.dir)));
-  });
-  root.querySelector('[data-rotate]')!.addEventListener('click', tryRotate);
+  root.querySelector('[data-replay]')!.addEventListener('click', reset);
+  root.querySelector('[data-next]')!.addEventListener('click', () => picker.selectNext());
 
   function onKey(e: KeyboardEvent): void {
-    const dirs: Record<string, number> = {
-      ArrowLeft: -1,
-      ArrowRight: 1,
-      ArrowUp: -8,
-      ArrowDown: 8,
+    if ((e.ctrlKey || e.metaKey) && (e.key === 'z' || e.key === 'Z')) {
+      e.preventDefault();
+      undo();
+      return;
+    }
+    const dirs: Record<string, [number, number]> = {
+      ArrowLeft: [0, -1],
+      ArrowRight: [0, 1],
+      ArrowUp: [-1, 0],
+      ArrowDown: [1, 0],
     };
     if (e.key in dirs) {
       e.preventDefault();
-      trySlide(dirs[e.key]);
-    } else if (e.key === 'r' || e.key === 'R') {
-      tryRotate();
+      if (selected >= 0) tryGlide(selected, dirs[e.key][0], dirs[e.key][1]);
     } else if (e.key === 'Escape') {
       selected = -1;
       board?.setSelected(-1);
@@ -200,56 +269,6 @@ export function createPlayTab(): TabController {
 
   function tick(dt: number): void {
     picker.tick();
-
-    // background BFS for the "Optimal" counter
-    if (optimalSolver) {
-      let n = 4000;
-      while (n-- > 0 && !optimalSolver.done && optimalSolver.stats.explored < OPTIMAL_CAP) {
-        optimalSolver.step();
-      }
-      if (optimalSolver.done || optimalSolver.stats.explored >= OPTIMAL_CAP) {
-        optimal =
-          optimalSolver.goalId !== null
-            ? optimalSolver.nodes[optimalSolver.goalId].depth
-            : null;
-        optimalSolver = null;
-        updateStats();
-      }
-    }
-
-    // background BFS for "Show optimal", then animated playback
-    if (playbackSolver) {
-      let n = 4000;
-      while (n-- > 0 && !playbackSolver.done && playbackSolver.stats.explored < OPTIMAL_CAP) {
-        playbackSolver.step();
-      }
-      if (playbackSolver.done || playbackSolver.stats.explored >= OPTIMAL_CAP) {
-        const path = playbackSolver.path();
-        playbackSolver = null;
-        if (path) {
-          playback = path.map((node) => node.state);
-          playbackStep = 0;
-          playbackClock = 0;
-        }
-      }
-    }
-    if (playback) {
-      playbackClock += dt;
-      if (playbackClock > 0.3) {
-        playbackClock = 0;
-        playbackStep++;
-        if (playbackStep < playback.length) {
-          current = cloneState(playback[playbackStep]);
-          board?.applyState(current);
-        }
-        if (playbackStep >= playback.length - 1) {
-          playbackStep = playback.length - 1;
-          playback = null;
-          win(true);
-        }
-      }
-    }
-
     board?.frame(dt);
   }
 
@@ -269,14 +288,6 @@ export function createPlayTab(): TabController {
     activate() {
       if (!built) {
         built = true;
-        board = new BoardView(boardHost, {
-          interactive: true,
-          onPieceClick: (idx) => {
-            if (playback || playbackSolver) return;
-            selected = idx ?? -1;
-            board?.setSelected(selected);
-          },
-        });
         picker.load();
       }
       window.addEventListener('keydown', onKey);

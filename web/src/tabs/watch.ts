@@ -4,9 +4,10 @@
 
 import { GraphView } from '../render/graphView';
 import { BoardView } from '../render/boardView';
+import { classicLayout } from '../render/layouts';
 import { LevelPicker } from '../ui/levelPicker';
 import { el, fmt, TabController } from '../ui/dom';
-import { State, cloneState } from '../core/board';
+import { Move, State, classicRules, cloneState } from '../core/board';
 import { Solver, SolverEvent } from '../core/solver';
 import { levelById } from '../core/levels';
 
@@ -92,7 +93,7 @@ export function createWatchTab(): TabController {
 
   let graph: GraphView | null = null;
   let mini: BoardView | null = null;
-  let solver: Solver | null = null;
+  let solver: Solver<State, Move> | null = null;
   let levelState: State = cloneState(levelById('warming-up')!.state);
   let playing = false;
   let budget = 0;
@@ -123,7 +124,7 @@ export function createWatchTab(): TabController {
   }
 
   function newRun(): void {
-    solver = new Solver(cloneState(levelState), 'bfs', picker.rotation);
+    solver = new Solver(classicRules(picker.rotation), cloneState(levelState), 'bfs');
     graph?.reset();
     graph?.addNode(0, -1, 0);
     mini?.setLevel(levelState);
@@ -280,7 +281,7 @@ export function createWatchTab(): TabController {
       if (!built) {
         built = true;
         graph = new GraphView(graphHost, { maxNodes: 60_000, bloom: true });
-        mini = new BoardView(miniHost, { interactive: false });
+        mini = new BoardView(miniHost, classicLayout(), { interactive: false });
         picker.load();
         if (new URLSearchParams(location.search).get('run') === '1') setPlaying(true);
       }

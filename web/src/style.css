@@ -393,6 +393,18 @@ input[type='range'] {
   color: var(--gold);
 }
 
+.overlay-card .stars {
+  font-size: 40px;
+  letter-spacing: 10px;
+  color: var(--gold);
+  text-shadow: 0 0 22px rgba(255, 183, 3, 0.6);
+  margin-bottom: 6px;
+}
+
+.btnrow.center {
+  justify-content: center;
+}
+
 .overlay-card p {
   margin: 0 0 18px;
   color: var(--muted);

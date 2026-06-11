@@ -4,6 +4,7 @@
 // which starts at index 9 (top-left) and must reach index 45 (bottom-right).
 
 import { pieceDef } from './pieces';
+import { Rules } from './solver';
 
 export const W = 8;
 export const H = 8;
@@ -108,4 +109,14 @@ export function manhattanToGoal(state: State): number {
 
 export function cloneState(state: State): State {
   return state.map((p) => ({ piece: p.piece, index: p.index }));
+}
+
+/** The original 2014 rules as a solver adapter: one-cell slides (+ optional rotation). */
+export function classicRules(allowRotation: boolean): Rules<State, Move> {
+  return {
+    successors: (s) => successors(s, allowRotation),
+    isSolved,
+    key: keyOf,
+    heuristic: manhattanToGoal,
+  };
 }

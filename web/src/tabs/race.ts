@@ -5,7 +5,7 @@
 import { GraphView } from '../render/graphView';
 import { LevelPicker } from '../ui/levelPicker';
 import { el, fmt, TabController } from '../ui/dom';
-import { State, cloneState } from '../core/board';
+import { Move, State, classicRules, cloneState } from '../core/board';
 import { Algo, Solver, SolverEvent } from '../core/solver';
 import { levelById } from '../core/levels';
 
@@ -37,7 +37,7 @@ interface Racer {
   spec: RacerSpec;
   host: HTMLElement;
   graph: GraphView | null;
-  solver: Solver | null;
+  solver: Solver<State, Move> | null;
   finished: boolean;
   statusEl: HTMLElement;
   exploredEl: HTMLElement;
@@ -135,7 +135,7 @@ export function createRaceTab(): TabController {
   function startRace(): void {
     resetRace();
     for (const r of racers) {
-      r.solver = new Solver(cloneState(levelState), r.spec.algo, picker.rotation);
+      r.solver = new Solver(classicRules(picker.rotation), cloneState(levelState), r.spec.algo);
       r.graph?.addNode(0, -1, 0);
       r.statusEl.textContent = 'searching…';
     }

@@ -4,7 +4,7 @@
 // animation frames (showing the attempt counter live) without freezing the UI.
 
 import { FAMILIES, pieceDef } from './pieces';
-import { CELLS, HERO_START, Placement, State, isWall } from './board';
+import { CELLS, HERO_START, Move, Placement, State, classicRules, isWall } from './board';
 import { Solver } from './solver';
 
 export type Rng = () => number;
@@ -91,7 +91,7 @@ export class LevelSearch {
   attempts = 0;
   statesChecked = 0;
 
-  private solver: Solver | null = null;
+  private solver: Solver<State, Move> | null = null;
   private candidate: State | null = null;
   private readonly minOptimal: number;
   private readonly maxStates: number;
@@ -118,7 +118,7 @@ export class LevelSearch {
           continue;
         }
         this.candidate = placed;
-        this.solver = new Solver(placed, 'bfs', this.allowRotation);
+        this.solver = new Solver(classicRules(this.allowRotation), placed, 'bfs');
       }
 
       const before = this.solver.stats.explored;

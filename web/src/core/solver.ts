@@ -1,20 +1,31 @@
 // Incremental graph-search solver, ported from LevelGeneratorService.Solve (the BFS)
-// and generalized: the frontier data structure is the only difference between
-// BFS (queue), DFS (stack) and A* (priority queue ordered by depth + heuristic).
+// and generalized twice:
+//  - the frontier data structure is the only difference between BFS (queue),
+//    DFS (stack) and A* (priority queue ordered by depth + heuristic);
+//  - the game rules are injected as a Rules<S> adapter, so the same solver runs
+//    the classic 2014 sliding rules and the glide ("slide until you hit
+//    something") rules alike.
 //
 // The solver advances one expansion at a time via step() and emits events,
 // so the UI can visualize the search as it happens.
 
-import { State, Move, keyOf, successors, isSolved, manhattanToGoal } from './board';
-
 export type Algo = 'bfs' | 'dfs' | 'astar';
 
-export interface SearchNode {
+/** Everything the solver needs to know about a game. */
+export interface Rules<S, M = unknown> {
+  successors(state: S): { state: S; move: M }[];
+  isSolved(state: S): boolean;
+  key(state: S): string;
+  /** Admissible estimate of remaining moves (used by A* only). */
+  heuristic(state: S): number;
+}
+
+export interface SearchNode<S, M = unknown> {
   id: number;
-  state: State;
+  state: S;
   parent: number;
   depth: number;
-  move: Move | null;
+  move: M | null;
 }
 
 export type SolverEvent =
@@ -80,8 +91,8 @@ class MinHeap {
   }
 }
 
-export class Solver {
-  readonly nodes: SearchNode[] = [];
+export class Solver<S, M = unknown> {
+  readonly nodes: SearchNode<S, M>[] = [];
   readonly stats: SolverStats = { explored: 0, generated: 0, duplicates: 0, maxDepth: 0 };
   done = false;
   goalId: number | null = null;
@@ -93,15 +104,15 @@ export class Solver {
   private heap = new MinHeap();
 
   constructor(
-    readonly start: State,
+    readonly rules: Rules<S, M>,
+    readonly start: S,
     readonly algo: Algo,
-    readonly allowRotation: boolean,
   ) {
-    const root: SearchNode = { id: 0, state: start, parent: -1, depth: 0, move: null };
+    const root: SearchNode<S, M> = { id: 0, state: start, parent: -1, depth: 0, move: null };
     this.nodes.push(root);
-    this.seen.set(keyOf(start), 0);
+    this.seen.set(rules.key(start), 0);
     this.push(0);
-    if (isSolved(start)) {
+    if (rules.isSolved(start)) {
       this.done = true;
       this.goalId = 0;
     }
@@ -115,7 +126,7 @@ export class Solver {
 
   private push(id: number): void {
     if (this.algo === 'astar') {
-      this.heap.push(id, this.nodes[id].depth + manhattanToGoal(this.nodes[id].state));
+      this.heap.push(id, this.nodes[id].depth + this.rules.heuristic(this.nodes[id].state));
     } else {
       this.queue.push(id);
     }
@@ -151,16 +162,16 @@ export class Solver {
     this.stats.explored++;
 
     // A* must check the goal when a state is *expanded*, or optimality is lost.
-    if (this.algo === 'astar' && isSolved(node.state)) {
+    if (this.algo === 'astar' && this.rules.isSolved(node.state)) {
       this.done = true;
       this.goalId = id;
       events.push({ type: 'done', goalId: id });
       return events;
     }
 
-    for (const { state, move } of successors(node.state, this.allowRotation)) {
+    for (const { state, move } of this.rules.successors(node.state)) {
       this.stats.generated++;
-      const key = keyOf(state);
+      const key = this.rules.key(state);
       const existing = this.seen.get(key);
       if (existing !== undefined) {
         // A* may find a *shorter* path to a state that is still in the open list.
@@ -180,7 +191,7 @@ export class Solver {
         continue;
       }
 
-      const child: SearchNode = {
+      const child: SearchNode<S, M> = {
         id: this.nodes.length,
         state,
         parent: id,
@@ -193,7 +204,7 @@ export class Solver {
       events.push({ type: 'discover', id: child.id, parent: id, depth: child.depth });
 
       // BFS/DFS may stop as soon as the goal is generated (matches the C# solver).
-      if (this.algo !== 'astar' && isSolved(state)) {
+      if (this.algo !== 'astar' && this.rules.isSolved(state)) {
         this.done = true;
         this.goalId = child.id;
         events.push({ type: 'done', goalId: child.id });
@@ -205,9 +216,9 @@ export class Solver {
   }
 
   /** Root-to-goal node chain, or null if no solution (yet). */
-  path(): SearchNode[] | null {
+  path(): SearchNode<S, M>[] | null {
     if (this.goalId === null) return null;
-    const out: SearchNode[] = [];
+    const out: SearchNode<S, M>[] = [];
     for (let id = this.goalId; id !== -1; id = this.nodes[id].parent) {
       out.push(this.nodes[id]);
     }

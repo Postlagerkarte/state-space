@@ -4,6 +4,7 @@
 
 import { LevelSearch, mulberry32, GeneratedLevel } from '../src/core/generator';
 import { Solver } from '../src/core/solver';
+import { classicRules } from '../src/core/board';
 
 function mine(pieceCount: number, total: number, seed: number): GeneratedLevel[] {
   const rng = mulberry32(seed);
@@ -25,7 +26,7 @@ for (const pieceCount of [3, 4, 5, 6]) {
   const interesting = [...found.slice(0, 5), ...found.slice(-2)];
   for (const lvl of interesting) {
     // Re-solve to double-check and report A* stats for comparison.
-    const astar = new Solver(lvl.state, 'astar', false);
+    const astar = new Solver(classicRules(false), lvl.state, 'astar');
     astar.run(500_000);
     const astarOptimal = astar.goalId !== null ? astar.nodes[astar.goalId].depth : -1;
     console.log(
