@@ -111,7 +111,15 @@ export class BoardView {
   private celebrateEvents: { at: number; fn: () => void }[] = [];
   private spins: { group: THREE.Group; t: number }[] = [];
   private presses: { group: THREE.Group; dirX: number; dirZ: number; t: number }[] = [];
-  private previews: { group: THREE.Group; mat: THREE.MeshBasicMaterial; onGoal: boolean }[] = [];
+  private previews: {
+    group: THREE.Group;
+    mat: THREE.MeshBasicMaterial;
+    onGoal: boolean;
+    dr: number;
+    dc: number;
+    mark: 'warm' | 'fatal' | null;
+  }[] = [];
+  private targeting = false;
   private previewStrips: { mesh: THREE.Mesh; mat: THREE.MeshBasicMaterial }[] = [];
   private hintRun: {
     group: THREE.Group;
@@ -593,7 +601,7 @@ export class BoardView {
         group.add(mesh);
       }
       this.scene.add(group);
-      this.previews.push({ group, mat, onGoal: spec.onGoal });
+      this.previews.push({ group, mat, onGoal: spec.onGoal, dr: spec.dr, dc: spec.dc, mark: null });
 
       // faint path strip from the piece to the landing spot
       const fromX = this.cellX(fromIndex);
@@ -657,6 +665,70 @@ export class BoardView {
       if (move) return move as { pieceIdx: number; dr: number; dc: number };
     }
     return null;
+  }
+
+  /**
+   * Stage-2 assist: mark landing previews discovered to lie on an optimal path
+   * (warm gold shimmer) or to make the board unsolvable (red edge).
+   */
+  decoratePreviews(marks: { dr: number; dc: number; kind: 'warm' | 'fatal' }[]): void {
+    for (const mark of marks) {
+      const preview = this.previews.find((p) => p.dr === mark.dr && p.dc === mark.dc);
+      if (!preview || preview.onGoal) continue;
+      preview.mark = mark.kind;
+      if (mark.kind === 'warm') {
+        preview.mat.color.setHex(0xffd166);
+        preview.mat.opacity = 0.26;
+      } else {
+        preview.mat.color.setHex(0xff4d6d);
+        preview.mat.opacity = 0.11;
+      }
+    }
+  }
+
+  /** Bomb booster: blow a piece off the board (with appropriate ceremony). */
+  removePiece(pieceIdx: number): void {
+    const group = this.pieceGroups[pieceIdx];
+    if (!group || !this.state || pieceIdx >= this.state.length) return;
+    const cells = this.layout.cells(this.state[pieceIdx]);
+    let cx = 0;
+    let cz = 0;
+    for (const cell of cells) {
+      cx += this.cellX(cell);
+      cz += this.cellZ(cell);
+    }
+    cx /= cells.length;
+    cz /= cells.length;
+    this.spawnFirework(cx, cz, 80, 5.5, 1.0);
+    this.spawnDust(cx, cz);
+    this.spawnDust(cx, cz);
+    this.camShake = Math.max(this.camShake, 0.3);
+
+    this.scene.remove(group);
+    (group.userData.material as THREE.Material).dispose();
+    this.pieceGroups.splice(pieceIdx, 1);
+    this.state.splice(pieceIdx, 1);
+    this.pieceGroups.forEach((g, i) => {
+      g.userData.pieceIdx = i;
+      for (const child of g.children) child.userData.pieceIdx = i;
+    });
+    this.clearPreviews();
+  }
+
+  /** Pulse all blockers as bomb targets (hero excluded). */
+  setTargeting(on: boolean): void {
+    this.targeting = on;
+    if (!on) {
+      this.pieceGroups.forEach((g, i) => {
+        const mat = g.userData.material as THREE.MeshStandardMaterial;
+        mat.emissiveIntensity = i === this.selected ? 0.55 : (g.userData.baseEmissive as number);
+      });
+    }
+  }
+
+  /** Celebration ring at the board center (tier-up fanfare). */
+  fanfareRing(): void {
+    this.spawnRing(0, 0);
   }
 
   /** Hint: a ghost of the piece repeatedly glides its optimal path. */
@@ -969,9 +1041,19 @@ export class BoardView {
       }
     }
 
-    // the on-goal landing preview pulses invitingly
+    // the on-goal landing preview pulses invitingly; warm assists shimmer gently
     for (const p of this.previews) {
       if (p.onGoal) p.mat.opacity = 0.34 + Math.sin(this.time * 5) * 0.14;
+      else if (p.mark === 'warm') p.mat.opacity = 0.24 + Math.sin(this.time * 3.6) * 0.09;
+    }
+
+    // bomb targeting: blockers pulse like they know what's coming
+    if (this.targeting) {
+      this.pieceGroups.forEach((g, i) => {
+        if (i === 0) return;
+        const mat = g.userData.material as THREE.MeshStandardMaterial;
+        mat.emissiveIntensity = 0.3 + Math.sin(this.time * 7 + i) * 0.22;
+      });
     }
 
     // hint: ghost glides its optimal path, three times

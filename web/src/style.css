@@ -737,6 +737,84 @@ input[type='range'] {
   font-size: 13px;
 }
 
+.rush-pacer {
+  font-size: 11px;
+  color: rgba(141, 151, 179, 0.7);
+}
+
+.rush-pacer.warm {
+  color: #ffb703;
+}
+
+.rush-pacer.gold {
+  color: var(--gold);
+  font-weight: 700;
+  text-shadow: 0 0 10px rgba(255, 183, 3, 0.6);
+}
+
+.booster-row {
+  display: flex;
+  gap: 8px;
+  pointer-events: auto;
+}
+
+.booster-chip {
+  appearance: none;
+  position: relative;
+  border: 1px solid rgba(255, 209, 102, 0.4);
+  background: rgba(255, 183, 3, 0.12);
+  border-radius: 12px;
+  font-size: 21px;
+  padding: 6px 12px;
+  cursor: pointer;
+  transition: all 0.12s ease;
+  animation: combopulse 0.4s cubic-bezier(0.2, 2, 0.5, 1);
+}
+
+.booster-chip:hover {
+  background: rgba(255, 183, 3, 0.28);
+  transform: translateY(-2px);
+}
+
+.booster-chip span {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  font-size: 10px;
+  font-weight: 800;
+  color: #1d1503;
+  background: var(--gold);
+  border-radius: 999px;
+  width: 16px;
+  height: 16px;
+  line-height: 16px;
+  text-align: center;
+}
+
+.time-fill.frozen {
+  background: linear-gradient(90deg, #59e3ff, #a8f0ff);
+  box-shadow: 0 0 16px rgba(89, 227, 255, 0.8);
+}
+
+.popup.big {
+  font-size: 44px;
+  letter-spacing: 0.06em;
+}
+
+.popup.cyan {
+  color: var(--cyan);
+}
+
+.press-r {
+  margin-top: 14px;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.press-r b {
+  color: var(--text);
+}
+
 .rush-skip {
   margin-left: auto;
   pointer-events: auto;

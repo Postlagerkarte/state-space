@@ -18,14 +18,27 @@ import {
   glideMove,
   glideRules,
 } from '../core/glide';
+import { gKey } from '../core/glide';
 import { mulberry32 } from '../core/generator';
 import { Solver } from '../core/solver';
+import { AssistEvaluator } from '../game/assist';
 import * as sound from '../game/sound';
 
 const BANK_START = 25;
 const BANK_CAP = 40;
 const PREVIEW_DELAY_MS = 2500;
+const ASSIST_DELAY_MS = 6500;
+const FREEZE_SECONDS = 5;
+const BOOSTER_CAP = 3;
+const CLUTCH_WINDOW = 2; // seconds left for a clutch bonus
+const TIER_THRESHOLDS = [3, 7, 13, 21, 31]; // must match difficulty()
 const BEST_KEY = 'statespace.rush.best';
+
+type Booster = 'bomb' | 'freeze';
+
+function tierOf(solved: number): number {
+  return 1 + TIER_THRESHOLDS.filter((t) => solved >= t).length;
+}
 
 function difficulty(solved: number): GlideGenOptions {
   if (solved < 3) return { blockers: 1, minOptimal: 1, maxOptimal: 2, maxStates: 10_000 };
@@ -58,11 +71,16 @@ export function createRushTab(): TabController {
           <div class="rush-stats-row">
             <div class="rush-score" data-score>0</div>
             <div class="combo-badge" data-combo hidden>×1</div>
-            <div class="rush-boards" data-boards>board 1</div>
+            <div class="rush-boards-wrap">
+              <div class="rush-boards" data-boards>board 1</div>
+              <div class="rush-pacer" data-pacer hidden></div>
+            </div>
+            <div class="booster-row" data-boosters></div>
             <button class="btn rush-skip" data-skip title="Skip this board (-5s, breaks combo)">SKIP −5s</button>
           </div>
         </div>
         <div class="mining-note" data-mining hidden>⛏ mining next board…</div>
+        <div class="mining-note target-note" data-target-note hidden>💣 click a blocker to destroy it — Esc to cancel</div>
         <div class="vignette" data-vignette></div>
         <div class="popups" data-popups></div>
 
@@ -88,6 +106,7 @@ export function createRushTab(): TabController {
               <button class="btn primary big" data-again>⚡ &nbsp;RUN AGAIN</button>
               <button class="btn" data-zen>🧘 practice in Zen</button>
             </div>
+            <p class="press-r">press <b>R</b> to run again</p>
           </div>
         </div>
       </div>
@@ -109,6 +128,9 @@ export function createRushTab(): TabController {
   const newBestEl = root.querySelector<HTMLElement>('[data-newbest]')!;
   const finalScoreEl = root.querySelector<HTMLElement>('[data-final-score]')!;
   const deathStatsEl = root.querySelector<HTMLElement>('[data-death-stats]')!;
+  const boostersEl = root.querySelector<HTMLElement>('[data-boosters]')!;
+  const pacerEl = root.querySelector<HTMLElement>('[data-pacer]')!;
+  const targetNote = root.querySelector<HTMLElement>('[data-target-note]')!;
 
   let board: BoardView | null = null;
   let phase: 'idle' | 'running' | 'transition' | 'dead' = 'idle';
@@ -137,6 +159,22 @@ export function createRushTab(): TabController {
   let prevDist: number | null = null;
   let baseDist = 0;
 
+  // boosters
+  let boosters: Booster[] = [];
+  let freezeLeft = 0;
+  let bombArmed = false;
+  let lastTier = 1;
+  let bestCache: Best = loadBest();
+
+  // stage-2 assist (warm/fatal shimmer on the previews)
+  let assist: AssistEvaluator | null = null;
+  let decoratedToken = '';
+
+  function assistToken(): string {
+    const idx = hoverIdx >= 0 ? hoverIdx : selected;
+    return `${gKey(current)}|${idx}`;
+  }
+
   function updateHud(): void {
     scoreEl.textContent = fmt(score);
     boardsEl.textContent = `board ${solvedCount + 1}`;
@@ -146,6 +184,93 @@ export function createRushTab(): TabController {
     } else {
       comboEl.hidden = true;
     }
+    // best-run pacer: racing your own ghost
+    if (bestCache.boards > 0) {
+      pacerEl.hidden = false;
+      if (solvedCount + 1 > bestCache.boards) {
+        pacerEl.textContent = 'past your best!';
+        pacerEl.className = 'rush-pacer gold';
+      } else {
+        pacerEl.textContent = `best: board ${bestCache.boards}`;
+        pacerEl.className =
+          bestCache.boards - (solvedCount + 1) <= 2 ? 'rush-pacer warm' : 'rush-pacer';
+      }
+    } else {
+      pacerEl.hidden = true;
+    }
+  }
+
+  function renderBoosters(): void {
+    boostersEl.innerHTML = boosters
+      .map(
+        (b, i) =>
+          `<button class="booster-chip" data-use="${i}" title="${
+            b === 'bomb' ? 'Bomb: destroy a blocker' : `Freeze: stop the clock ${FREEZE_SECONDS}s`
+          } (key ${i + 1})">${b === 'bomb' ? '💣' : '⏱'}<span>${i + 1}</span></button>`,
+      )
+      .join('');
+  }
+
+  function cancelBombTargeting(): void {
+    if (!bombArmed) return;
+    bombArmed = false;
+    targetNote.hidden = true;
+    board?.setTargeting(false);
+    if (board) board.domElement.style.cursor = 'default';
+  }
+
+  function useBooster(i: number): void {
+    if (phase !== 'running' || i >= boosters.length) return;
+    const booster = boosters[i];
+    if (booster === 'freeze') {
+      boosters.splice(i, 1);
+      renderBoosters();
+      cancelBombTargeting();
+      freezeLeft = FREEZE_SECONDS;
+      sound.freeze();
+      popup(`⏱ frozen ${FREEZE_SECONDS}s`, 'cyan');
+    } else {
+      // bomb: arm targeting; consumed only when it actually detonates
+      cancelBombTargeting();
+      bombArmed = true;
+      targetNote.hidden = false;
+      board?.setTargeting(true);
+      if (board) board.domElement.style.cursor = 'crosshair';
+    }
+  }
+
+  function detonate(pieceIdx: number): void {
+    if (!board || !level || pieceIdx <= 0) return;
+    const slot = boosters.indexOf('bomb');
+    if (slot === -1) return;
+    boosters.splice(slot, 1);
+    renderBoosters();
+    cancelBombTargeting();
+    current = current.filter((_, i) => i !== pieceIdx);
+    selected = -1;
+    hoverIdx = -1;
+    board.removePiece(pieceIdx);
+    sound.boom();
+    decoratedToken = '';
+    assist = null;
+    // the board changed materially — re-judge it (this is where a bad bomb
+    // gets caught: blowing up your own backstop triggers the dead-end skip)
+    prevDist = null;
+    startDistCheck();
+  }
+
+  function earnBooster(): void {
+    if (boosters.length >= BOOSTER_CAP) {
+      const consolation = 250 * combo;
+      score += consolation;
+      popup(`+${fmt(consolation)} (pockets full)`, 'gold small');
+      return;
+    }
+    const booster: Booster = Math.random() < 0.55 ? 'bomb' : 'freeze';
+    boosters.push(booster);
+    renderBoosters();
+    sound.boosterEarn();
+    popup(`${booster === 'bomb' ? '💣 BOMB' : '⏱ FREEZE'} earned!`, 'cyan');
   }
 
   function popup(text: string, cls = ''): void {
@@ -208,6 +333,13 @@ export function createRushTab(): TabController {
     }
     miningEl.hidden = true;
     loadBoard(lvl, true);
+    const tier = tierOf(solvedCount);
+    if (tier > lastTier) {
+      lastTier = tier;
+      popup(`TIER ${tier}`, 'big gold');
+      sound.tierUp();
+      window.setTimeout(() => board?.fanfareRing(), 250);
+    }
     window.setTimeout(() => {
       if (phase === 'transition') phase = 'running';
     }, 420);
@@ -223,6 +355,14 @@ export function createRushTab(): TabController {
     score = 0;
     combo = 1;
     maxCombo = 1;
+    boosters = [];
+    freezeLeft = 0;
+    lastTier = 1;
+    bestCache = loadBest();
+    assist = null;
+    decoratedToken = '';
+    cancelBombTargeting();
+    renderBoosters();
     const bankParam = Number(new URLSearchParams(location.search).get('bank'));
     bank = Number.isFinite(bankParam) && bankParam > 0 ? bankParam : BANK_START;
     lastTickSecond = -1;
@@ -246,6 +386,7 @@ export function createRushTab(): TabController {
     phase = 'dead';
     sound.gameOver();
     sound.setMelodyKey(0);
+    cancelBombTargeting();
     board?.clearPreviews();
     const best = loadBest();
     const isBest = score > best.score;
@@ -254,7 +395,7 @@ export function createRushTab(): TabController {
     }
     newBestEl.hidden = !isBest;
     deathStatsEl.textContent =
-      `${solvedCount} boards · best combo ×${maxCombo}` +
+      `${solvedCount} boards · tier ${tierOf(solvedCount)} · best combo ×${maxCombo}` +
       (isBest ? '' : ` · best ${fmt(best.score)}`);
     deathOverlay.hidden = false;
     // score count-up
@@ -273,9 +414,11 @@ export function createRushTab(): TabController {
     if (!level) return;
     phase = 'transition';
     distSolver = null;
+    cancelBombTargeting();
     board?.clearPreviews();
     const par = level.optimal;
     const atPar = movesThisBoard <= par;
+    const isClutch = bank < CLUTCH_WINDOW;
 
     window.setTimeout(() => sound.melodyNote(baseDist), Math.max(0, dur * 1000 - 10));
     window.setTimeout(() => board?.celebrate('quick'), dur * 1000 + 60);
@@ -285,6 +428,10 @@ export function createRushTab(): TabController {
       maxCombo = Math.max(maxCombo, combo);
       sound.setMelodyKey(2 * Math.min(combo - 1, 6));
       window.setTimeout(() => sound.comboUp(combo), dur * 1000 + 180);
+      // combo milestones pay out a booster: protecting the streak pays twice
+      if (combo >= 3 && combo % 2 === 1) {
+        window.setTimeout(() => earnBooster(), dur * 1000 + 420);
+      }
     } else if (combo > 1) {
       combo = 1;
       sound.setMelodyKey(0);
@@ -294,7 +441,13 @@ export function createRushTab(): TabController {
 
     const grant = 3 + 1.5 * par;
     bank = Math.min(BANK_CAP, bank + grant);
-    const points = Math.round((100 * par + 15 * Math.max(0, Math.floor(bank))) * combo);
+    let points = Math.round((100 * par + 15 * Math.max(0, Math.floor(bank))) * combo);
+    if (isClutch) {
+      const bonus = 250 * combo;
+      points += bonus;
+      popup('CLUTCH!', 'big gold');
+      window.setTimeout(() => sound.clutch(), dur * 1000 + 250);
+    }
     score += points;
     solvedCount++;
     popup(`+${fmt(points)}${combo > 1 ? ` ×${combo}` : ''}`, 'gold');
@@ -308,6 +461,7 @@ export function createRushTab(): TabController {
     if (phase !== 'running') return;
     phase = 'transition';
     distSolver = null;
+    cancelBombTargeting();
     board?.clearPreviews();
     if (reason === 'manual') {
       bank = Math.max(0.5, bank - 5);
@@ -378,6 +532,7 @@ export function createRushTab(): TabController {
     }
     board.showPreviews(specs, current[idx].index);
     previewsShown = true;
+    decoratedToken = ''; // fresh ghosts carry no decoration yet
   }
 
   // -- input --------------------------------------------------------------------
@@ -390,6 +545,16 @@ export function createRushTab(): TabController {
       'pointerdown',
       (e) => {
         if (phase !== 'running') return;
+        if (bombArmed) {
+          const target = bv.pickAt(e.clientX, e.clientY);
+          if (target !== null && target > 0) {
+            detonate(target);
+          } else {
+            cancelBombTargeting();
+            sound.knock();
+          }
+          return;
+        }
         const preview = bv.pickPreviewAt(e.clientX, e.clientY);
         if (preview) {
           tryGlide(preview.pieceIdx, preview.dr, preview.dc);
@@ -474,6 +639,8 @@ export function createRushTab(): TabController {
     current = slid.state;
     movesThisBoard++;
     lastMoveAt = performance.now();
+    cancelBombTargeting();
+    assist = null;
     const dur = board.applyState(current);
     sound.whoosh(slid.dist);
     impactAt = performance.now() + dur * 1000;
@@ -493,9 +660,13 @@ export function createRushTab(): TabController {
       startRun();
       return;
     }
-    if (phase === 'dead' && (e.key === 'Enter' || e.key === ' ')) {
+    if (phase === 'dead' && (e.key === 'Enter' || e.key === ' ' || e.key === 'r' || e.key === 'R')) {
       e.preventDefault();
       startRun();
+      return;
+    }
+    if (e.key === '1' || e.key === '2' || e.key === '3') {
+      useBooster(Number(e.key) - 1);
       return;
     }
     const dirs: Record<string, [number, number]> = {
@@ -508,6 +679,10 @@ export function createRushTab(): TabController {
       e.preventDefault();
       if (selected >= 0) tryGlide(selected, dirs[e.key][0], dirs[e.key][1]);
     } else if (e.key === 'Escape') {
+      if (bombArmed) {
+        cancelBombTargeting();
+        return;
+      }
       selected = -1;
       board?.setSelected(-1);
       refreshPreviews();
@@ -525,26 +700,53 @@ export function createRushTab(): TabController {
     }
 
     if (phase === 'running') {
-      bank -= dt;
+      if (freezeLeft > 0) {
+        freezeLeft -= dt;
+      } else {
+        bank -= dt;
+      }
       if (bank <= 0) {
         bank = 0;
         die();
       }
       const sec = Math.ceil(bank);
-      if (bank > 0 && bank < 5 && sec !== lastTickSecond) {
+      if (freezeLeft <= 0 && bank > 0 && bank < 5 && sec !== lastTickSecond) {
         lastTickSecond = sec;
         sound.tickTock();
       }
       if (!previewsShown && previewGateOpen() && (hoverIdx >= 0 || selected >= 0)) {
         refreshPreviews();
       }
+
+      // stage-2 assist: stuck with ghosts showing? judge the candidate moves
+      // with the solver and shimmer the promising ones (red-edge the fatal ones)
+      if (previewsShown && performance.now() - lastMoveAt > ASSIST_DELAY_MS && level) {
+        const token = assistToken();
+        const idx = hoverIdx >= 0 ? hoverIdx : selected;
+        if (idx >= 0 && decoratedToken !== token) {
+          if (!assist || assist.token !== token) {
+            assist = new AssistEvaluator(level.spec, current, idx, token);
+          }
+          const marks = assist.tick(3000);
+          if (marks) {
+            if (assist.token === assistToken()) {
+              board?.decoratePreviews(marks);
+              decoratedToken = token;
+            }
+            assist = null;
+          }
+        }
+      }
     }
 
     // HUD: time bar
     const frac = Math.max(0, Math.min(1, bank / BANK_CAP));
     timeFill.style.width = `${frac * 100}%`;
-    timeFill.className = `time-fill ${bank < 5 ? 'danger' : bank < 12 ? 'warn' : ''}`;
-    vignette.style.opacity = phase === 'running' && bank < 5 ? String(((5 - bank) / 5) * 0.55) : '0';
+    timeFill.className = `time-fill ${
+      freezeLeft > 0 ? 'frozen' : bank < 5 ? 'danger' : bank < 12 ? 'warn' : ''
+    }`;
+    vignette.style.opacity =
+      phase === 'running' && freezeLeft <= 0 && bank < 5 ? String(((5 - bank) / 5) * 0.55) : '0';
 
     if (distSolver) {
       let n = 4000;
@@ -567,6 +769,10 @@ export function createRushTab(): TabController {
   root.querySelector('[data-start-btn]')!.addEventListener('click', startRun);
   root.querySelector('[data-again]')!.addEventListener('click', startRun);
   root.querySelector('[data-skip]')!.addEventListener('click', () => skipBoard('manual'));
+  boostersEl.addEventListener('click', (e) => {
+    const chip = (e.target as HTMLElement).closest<HTMLElement>('[data-use]');
+    if (chip) useBooster(Number(chip.dataset.use));
+  });
   root.querySelector('[data-zen]')!.addEventListener('click', () => {
     root.dispatchEvent(new CustomEvent('switch-tab', { bubbles: true, detail: 'play' }));
   });

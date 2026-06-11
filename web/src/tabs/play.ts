@@ -6,9 +6,21 @@ import { BoardView } from '../render/boardView';
 import { glideLayout } from '../render/layouts';
 import { el, TabController } from '../ui/dom';
 import { GlidePicker, PickedLevel, setStars } from '../ui/glidePicker';
-import { GLIDE_DIRS, GMove, GState, gCloneState, gIsSolved, glideMove, glideRules } from '../core/glide';
+import {
+  GLIDE_DIRS,
+  GMove,
+  GState,
+  gCloneState,
+  gIsSolved,
+  gKey,
+  glideMove,
+  glideRules,
+} from '../core/glide';
 import { Solver } from '../core/solver';
+import { AssistEvaluator } from '../game/assist';
 import * as sound from '../game/sound';
+
+const ASSIST_DELAY_MS = 6500;
 
 export function createPlayTab(): TabController {
   const root = el(`
@@ -128,6 +140,13 @@ export function createPlayTab(): TabController {
   let hoverIdx = -1;
   let previewsShown = false;
   let lastMoveAt = 0;
+  let assist: AssistEvaluator | null = null;
+  let decoratedToken = '';
+
+  function assistToken(): string {
+    const idx = hoverIdx >= 0 ? hoverIdx : selected;
+    return `${gKey(current)}|${idx}`;
+  }
 
   function previewGateOpen(): boolean {
     if (!level) return false;
@@ -162,6 +181,7 @@ export function createPlayTab(): TabController {
     }
     board.showPreviews(specs, current[idx].index);
     previewsShown = true;
+    decoratedToken = ''; // fresh ghosts carry no decoration yet
   }
 
   // -- drag-to-glide input ---------------------------------------------------
@@ -416,6 +436,25 @@ export function createPlayTab(): TabController {
     // ghosts appear once the inactivity gate opens (instant on training levels)
     if (!previewsShown && previewGateOpen() && (hoverIdx >= 0 || selected >= 0) && !solvedShown) {
       refreshPreviews();
+    }
+
+    // stage-2 assist: still stuck? shimmer the promising landings, red-edge the fatal
+    if (previewsShown && !solvedShown && level && performance.now() - lastMoveAt > ASSIST_DELAY_MS) {
+      const token = assistToken();
+      const idx = hoverIdx >= 0 ? hoverIdx : selected;
+      if (idx >= 0 && decoratedToken !== token) {
+        if (!assist || assist.token !== token) {
+          assist = new AssistEvaluator(level.spec, current, idx, token);
+        }
+        const marks = assist.tick(3000);
+        if (marks) {
+          if (assist.token === assistToken()) {
+            board?.decoratePreviews(marks);
+            decoratedToken = token;
+          }
+          assist = null;
+        }
+      }
     }
 
     // pump the background distance solver a few thousand expansions per frame

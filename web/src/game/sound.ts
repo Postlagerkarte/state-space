@@ -246,6 +246,116 @@ export function comboBreak(): void {
   }
 }
 
+/** Big muffled explosion for the bomb booster. */
+export function boom(): void {
+  const c = ensure();
+  if (!c) return;
+  const t = c.currentTime;
+  const osc = c.createOscillator();
+  osc.type = 'sine';
+  osc.frequency.setValueAtTime(110, t);
+  osc.frequency.exponentialRampToValueAtTime(32, t + 0.28);
+  const oscGain = c.createGain();
+  oscGain.gain.setValueAtTime(0.5, t);
+  oscGain.gain.exponentialRampToValueAtTime(0.001, t + 0.35);
+  osc.connect(oscGain).connect(c.destination);
+  osc.start(t);
+  osc.stop(t + 0.4);
+
+  const burst = c.createBufferSource();
+  burst.buffer = noise(c);
+  const lp = c.createBiquadFilter();
+  lp.type = 'lowpass';
+  lp.frequency.setValueAtTime(2600, t);
+  lp.frequency.exponentialRampToValueAtTime(220, t + 0.3);
+  const burstGain = c.createGain();
+  burstGain.gain.setValueAtTime(0.4, t);
+  burstGain.gain.exponentialRampToValueAtTime(0.001, t + 0.32);
+  burst.connect(lp).connect(burstGain).connect(c.destination);
+  burst.start(t);
+  burst.stop(t + 0.35);
+}
+
+/** Icy shimmer for the time-freeze booster. */
+export function freeze(): void {
+  const c = ensure();
+  if (!c) return;
+  const t = c.currentTime;
+  for (let i = 0; i < 4; i++) {
+    const osc = c.createOscillator();
+    osc.type = 'sine';
+    osc.frequency.value = 1568 * Math.pow(2, -i / 12 / 2);
+    const gain = c.createGain();
+    const at = t + i * 0.07;
+    gain.gain.setValueAtTime(0.001, at);
+    gain.gain.exponentialRampToValueAtTime(0.08, at + 0.02);
+    gain.gain.exponentialRampToValueAtTime(0.001, at + 0.3);
+    osc.connect(gain).connect(c.destination);
+    osc.start(at);
+    osc.stop(at + 0.32);
+  }
+}
+
+/** Sparkle when a booster is earned. */
+export function boosterEarn(): void {
+  const c = ensure();
+  if (!c) return;
+  const notes = [784, 1175];
+  notes.forEach((freq, i) => {
+    const t = c.currentTime + i * 0.08;
+    const osc = c.createOscillator();
+    osc.type = 'triangle';
+    osc.frequency.value = freq;
+    const gain = c.createGain();
+    gain.gain.setValueAtTime(0.001, t);
+    gain.gain.exponentialRampToValueAtTime(0.13, t + 0.015);
+    gain.gain.exponentialRampToValueAtTime(0.001, t + 0.25);
+    osc.connect(gain).connect(c.destination);
+    osc.start(t);
+    osc.stop(t + 0.28);
+  });
+}
+
+/** Triumphant double-hit for a clutch solve (under two seconds left). */
+export function clutch(): void {
+  const c = ensure();
+  if (!c) return;
+  const notes = [659.25, 987.77];
+  notes.forEach((freq, i) => {
+    const t = c.currentTime + i * 0.09;
+    const osc = c.createOscillator();
+    osc.type = 'square';
+    osc.frequency.value = freq;
+    const gain = c.createGain();
+    gain.gain.setValueAtTime(0.001, t);
+    gain.gain.exponentialRampToValueAtTime(0.09, t + 0.012);
+    gain.gain.exponentialRampToValueAtTime(0.001, t + 0.22);
+    osc.connect(gain).connect(c.destination);
+    osc.start(t);
+    osc.stop(t + 0.25);
+  });
+}
+
+/** Rising fanfare when the difficulty tier climbs. */
+export function tierUp(): void {
+  const c = ensure();
+  if (!c) return;
+  const notes = [392, 523.25, 659.25];
+  notes.forEach((freq, i) => {
+    const t = c.currentTime + i * 0.1;
+    const osc = c.createOscillator();
+    osc.type = 'triangle';
+    osc.frequency.value = freq;
+    const gain = c.createGain();
+    gain.gain.setValueAtTime(0.001, t);
+    gain.gain.exponentialRampToValueAtTime(0.14, t + 0.02);
+    gain.gain.exponentialRampToValueAtTime(0.001, t + 0.3);
+    osc.connect(gain).connect(c.destination);
+    osc.start(t);
+    osc.stop(t + 0.33);
+  });
+}
+
 /** Descending womp for the end of a run. */
 export function gameOver(): void {
   const c = ensure();
