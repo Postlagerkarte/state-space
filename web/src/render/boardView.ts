@@ -131,6 +131,8 @@ export class BoardView {
     t: number;
     runs: number;
   } | null = null;
+  private planParts: { obj: THREE.Object3D; mat: THREE.Material; ownGeo: boolean }[] = [];
+  private planMarkerMats: THREE.MeshBasicMaterial[] = [];
   private camShake = 0;
   private selected = -1;
   private time = 0;
@@ -361,6 +363,7 @@ export class BoardView {
     this.clearCelebrationFx();
     this.clearPreviews();
     this.clearHintRun();
+    this.clearPlan();
     this.presses = [];
     this.camShake = 0;
     this.selected = -1;
@@ -749,6 +752,83 @@ export class BoardView {
     this.spawnRing(0, 0);
   }
 
+  /**
+   * "Show the plan": draw the hero's route through the optimal solution as a
+   * glowing path with arrowheads, plus pulsing markers on cells where a
+   * stopper must be built that doesn't exist yet. The blockers' moves stay
+   * hidden — strategy is given, tactics remain the player's puzzle.
+   */
+  showPlan(plan: {
+    legs: { fromIndex: number; toIndex: number; dr: number; dc: number }[];
+    missingStops: number[];
+  }): void {
+    this.clearPlan();
+    this.clearPreviews();
+
+    // hero is 2x2, so its visual center sits half a cell off the anchor
+    const heroX = (idx: number) => this.cellX(idx) + 0.5;
+    const heroZ = (idx: number) => this.cellZ(idx) + 0.5;
+
+    const routeMat = new THREE.MeshBasicMaterial({
+      color: 0xffd166,
+      transparent: true,
+      opacity: 0.32,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false,
+    });
+
+    for (const leg of plan.legs) {
+      const fx = heroX(leg.fromIndex);
+      const fz = heroZ(leg.fromIndex);
+      const tx = heroX(leg.toIndex);
+      const tz = heroZ(leg.toIndex);
+      const alongX = leg.dc !== 0;
+      const len = Math.max(Math.abs(tx - fx), Math.abs(tz - fz));
+
+      const stripGeo = new THREE.BoxGeometry(alongX ? len : 0.3, 0.04, alongX ? 0.3 : len);
+      const strip = new THREE.Mesh(stripGeo, routeMat);
+      strip.position.set((fx + tx) / 2, 0.16, (fz + tz) / 2);
+      this.scene.add(strip);
+      this.planParts.push({ obj: strip, mat: routeMat, ownGeo: true });
+
+      const coneGeo = new THREE.ConeGeometry(0.24, 0.5, 12);
+      const cone = new THREE.Mesh(coneGeo, routeMat);
+      cone.quaternion.setFromUnitVectors(
+        new THREE.Vector3(0, 1, 0),
+        new THREE.Vector3(leg.dc, 0, leg.dr).normalize(),
+      );
+      cone.position.set(tx - leg.dc * 0.55, 0.16, tz - leg.dr * 0.55);
+      this.scene.add(cone);
+      this.planParts.push({ obj: cone, mat: routeMat, ownGeo: true });
+    }
+
+    for (const cell of plan.missingStops) {
+      const mat = new THREE.MeshBasicMaterial({
+        color: 0xffe9b0,
+        transparent: true,
+        opacity: 0.25,
+        depthWrite: false,
+      });
+      const marker = new THREE.Mesh(this.cubeGeo, mat);
+      marker.position.set(this.cellX(cell), 0.46, this.cellZ(cell));
+      this.scene.add(marker);
+      this.planParts.push({ obj: marker, mat, ownGeo: false });
+      this.planMarkerMats.push(mat);
+    }
+  }
+
+  clearPlan(): void {
+    for (const part of this.planParts) {
+      this.scene.remove(part.obj);
+      if (part.ownGeo) (part.obj as THREE.Mesh).geometry.dispose();
+    }
+    // route legs share one material; dispose each unique material once
+    const mats = new Set(this.planParts.map((p) => p.mat));
+    for (const mat of mats) mat.dispose();
+    this.planParts = [];
+    this.planMarkerMats = [];
+  }
+
   /** Hint: a ghost of the piece repeatedly glides its optimal path. */
   playHintRun(pieceIdx: number, toIndex: number): void {
     this.clearHintRun();
@@ -1071,6 +1151,11 @@ export class BoardView {
     for (const p of this.previews) {
       if (p.onGoal) p.mat.opacity = 0.34 + Math.sin(this.time * 5) * 0.14;
       else if (p.mark === 'warm') p.mat.opacity = 0.24 + Math.sin(this.time * 3.6) * 0.09;
+    }
+
+    // "build a stopper here" plan markers pulse to draw the eye
+    for (const mat of this.planMarkerMats) {
+      mat.opacity = 0.22 + Math.sin(this.time * 4.2) * 0.13;
     }
 
     // bomb targeting: blockers pulse like they know what's coming

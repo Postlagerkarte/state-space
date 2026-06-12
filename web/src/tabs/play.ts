@@ -18,6 +18,7 @@ import {
 } from '../core/glide';
 import { Solver } from '../core/solver';
 import { AssistEvaluator } from '../game/assist';
+import { extractPlan } from '../game/plan';
 import * as sound from '../game/sound';
 
 const ASSIST_DELAY_MS = 6500;
@@ -50,14 +51,15 @@ export function createPlayTab(): TabController {
         <div class="panel">
           <div class="btnrow">
             <button class="btn" data-undo title="Undo (Ctrl+Z)">↶ Undo</button>
-            <button class="btn" data-hint title="Show the next optimal move">💡 Hint</button>
+            <button class="btn" data-hint title="First press: the plan. Press again: the exact next move.">💡 Hint</button>
             <button class="btn" data-reset>Reset</button>
             <button class="btn" data-mute title="Toggle sound"></button>
           </div>
           <p class="hint"><b>Drag a piece</b> — it glides until it hits something.
           Stuck? Pause for a moment and hover a piece: ghosts show every spot it
           can glide to (click one to move). A <b class="gold">pulsing gold ghost</b>
-          means you're one move from winning.
+          means you're one move from winning. 💡 shows <b>the plan</b> — the gold
+          route your hero must take, and where a stopper still needs building.
           <br/><span class="dim">Right-drag to spin the board · scroll to zoom.</span></p>
         </div>
         <div class="panel note">
@@ -286,6 +288,7 @@ export function createPlayTab(): TabController {
     hoverIdx = -1;
     lastMoveAt = performance.now();
     hintsUsed = false;
+    planShown = false;
     solvedShown = false;
     overlay.hidden = true;
     toast.hidden = true;
@@ -310,6 +313,8 @@ export function createPlayTab(): TabController {
     lastMoveAt = performance.now();
     lastMove = { pieceIdx, dist: slid.dist };
     board.clearHintRun();
+    board.clearPlan();
+    planShown = false;
     toast.hidden = true;
     const dur = board.applyState(current);
     sound.whoosh(slid.dist);
@@ -364,6 +369,8 @@ export function createPlayTab(): TabController {
     current = gCloneState(history[history.length - 1]);
     lastMoveAt = performance.now();
     board.clearHintRun();
+    board.clearPlan();
+    planShown = false;
     toast.hidden = true;
     board.applyState(current);
     sound.swishBack();
@@ -373,6 +380,11 @@ export function createPlayTab(): TabController {
     prevDist = null;
     startDistCheck();
   }
+
+  // Two-stage hint. First press: the PLAN — the hero's route to the pad and
+  // where stoppers must be built (the why). Second press: the exact next move
+  // (the what), for the truly stuck.
+  let planShown = false;
 
   function hint(): void {
     if (!level || !board || solvedShown) return;
@@ -384,11 +396,19 @@ export function createPlayTab(): TabController {
       sound.knock();
       return;
     }
-    const move = path[1].move as GMove;
     hintsUsed = true;
+
+    if (!planShown) {
+      planShown = true;
+      board.clearHintRun();
+      board.showPlan(extractPlan(level.spec, current, path));
+      return;
+    }
+
+    const move = path[1].move as GMove;
     selected = move.pieceIdx;
     hoverIdx = -1;
-    lastMoveAt = 0; // asking for a hint opens the preview gate immediately
+    lastMoveAt = 0; // asking for the move opens the preview gate immediately
     board.setSelected(selected);
     refreshPreviews();
     // a ghost of the piece glides the optimal path so the move's shape is visible
