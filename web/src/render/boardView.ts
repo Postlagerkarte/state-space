@@ -64,7 +64,7 @@ interface SlideTween {
 }
 
 interface ScaleTween {
-  group: THREE.Group;
+  group: THREE.Object3D;
   from: number;
   to: number;
   t: number;
@@ -92,6 +92,8 @@ export class BoardView {
   private state: ViewState | null = null;
   private staticGroup: THREE.Group | null = null;
   private staticDisposables: { dispose(): void }[] = [];
+  private wallMat: THREE.MeshStandardMaterial | null = null;
+  private feverOn = false;
 
   private slides: SlideTween[] = [];
   private scales: ScaleTween[] = [];
@@ -244,6 +246,7 @@ export class BoardView {
     const tileGeo = new THREE.BoxGeometry(0.94, 0.1, 0.94);
     const tileMat = new THREE.MeshStandardMaterial({ color: 0x1b2233, roughness: 0.95 });
     const wallMat = new THREE.MeshStandardMaterial({ color: 0x39415a, roughness: 0.9 });
+    this.wallMat = wallMat;
     this.staticDisposables.push(tileGeo, tileMat, wallMat);
 
     for (let cell = 0; cell < width * height; cell++) {
@@ -736,6 +739,54 @@ export class BoardView {
     this.spawnFirework(cx / cells.length, cz / cells.length, 26, 2.6, 0.65);
   }
 
+  /** Which board cell is under the pointer? (ray vs. the board plane) */
+  pickCellAt(clientX: number, clientY: number): number | null {
+    const rect = this.renderer.domElement.getBoundingClientRect();
+    const ndc = new THREE.Vector2(
+      ((clientX - rect.left) / rect.width) * 2 - 1,
+      -((clientY - rect.top) / rect.height) * 2 + 1,
+    );
+    const ray = new THREE.Raycaster();
+    ray.setFromCamera(ndc, this.camera);
+    const hit = ray.ray.intersectPlane(
+      new THREE.Plane(new THREE.Vector3(0, 1, 0), -0.05),
+      new THREE.Vector3(),
+    );
+    if (!hit) return null;
+    const c = Math.round(hit.x + (this.layout.width - 1) / 2);
+    const r = Math.round(hit.z + (this.layout.height - 1) / 2);
+    if (r < 0 || r >= this.layout.height || c < 0 || c >= this.layout.width) return null;
+    return r * this.layout.width + c;
+  }
+
+  /** Build a new wall stub on the board with a satisfying pop-in. */
+  addWall(cell: number): void {
+    if (!this.staticGroup || !this.wallMat) return;
+    const wall = new THREE.Mesh(this.wallGeo, this.wallMat);
+    const h = 0.86 + (((cell * 2654435761) >>> 28) / 15) * 0.12;
+    wall.scale.y = h;
+    wall.position.y = 0.45 * h;
+    wall.castShadow = true;
+    wall.receiveShadow = true;
+    const holder = new THREE.Group();
+    holder.position.set(this.cellX(cell), 0, this.cellZ(cell));
+    holder.add(wall);
+    this.staticGroup.add(holder);
+    holder.scale.setScalar(0.01);
+    this.scales.push({ group: holder, from: 0.01, to: 1, t: 0, dur: 0.22 });
+    this.spawnDust(this.cellX(cell), this.cellZ(cell));
+  }
+
+  /** Fever state: the whole board burns hotter while the streak lives. */
+  setFever(on: boolean): void {
+    this.feverOn = on;
+    if (!on && this.pieceGroups[0]) {
+      const mat = this.pieceGroups[0].userData.material as THREE.MeshStandardMaterial;
+      mat.emissiveIntensity =
+        this.selected === 0 ? 0.55 : (this.pieceGroups[0].userData.baseEmissive as number);
+    }
+  }
+
   /** Pulse all blockers as bomb targets (hero excluded). */
   setTargeting(on: boolean): void {
     this.targeting = on;
@@ -1194,14 +1245,22 @@ export class BoardView {
       g.position.y += (targetY - g.position.y) * Math.min(1, dt * 12);
     });
 
-    // goal tiles pulse; brighter while celebrating
-    let glow = 0.3 + Math.sin(this.time * 2.5) * 0.15;
+    // goal tiles pulse; brighter while celebrating; hotter still in fever
+    let glow = this.feverOn
+      ? 0.55 + Math.sin(this.time * 4) * 0.25
+      : 0.3 + Math.sin(this.time * 2.5) * 0.15;
     if (this.celebrateT >= 0) {
       this.celebrateT += dt;
       glow += Math.max(0, 1.6 - this.celebrateT);
       if (this.celebrateT > 2.5) this.celebrateT = -1;
     }
     for (const m of this.goalMaterials) m.emissiveIntensity = glow;
+
+    // in fever the hero itself burns
+    if (this.feverOn && this.pieceGroups[0]) {
+      const mat = this.pieceGroups[0].userData.material as THREE.MeshStandardMaterial;
+      mat.emissiveIntensity = 0.5 + Math.sin(this.time * 6) * 0.15;
+    }
 
     this.controls?.update();
     if (this.camShake > 0.004) {

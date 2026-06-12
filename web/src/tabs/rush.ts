@@ -13,12 +13,14 @@ import {
   GlideLevel,
   GlideLevelSearch,
   GlideGenOptions,
+  gCells,
   gCloneState,
   gIsSolved,
   glideMove,
   glideRules,
 } from '../core/glide';
 import { gKey } from '../core/glide';
+import { ArchitectSearch } from '../core/architect';
 import { mulberry32 } from '../core/generator';
 import { Solver } from '../core/solver';
 import { AssistEvaluator } from '../game/assist';
@@ -32,15 +34,37 @@ const FREEZE_SECONDS = 5;
 const BOOSTER_CAP = 3;
 const CLUTCH_WINDOW = 2; // seconds left for a clutch bonus
 const TIER_THRESHOLDS = [3, 7, 13, 21, 31]; // must match difficulty()
+const FEVER_COMBO = 5;
+const FEVER_MULT = 1.5;
+const ARCHITECT_BONUS = 300;
+const QUICK_START_BOARDS = 7; // quick start begins at tier 3 (as if 7 boards solved)
+const QUICK_UNLOCK_BOARDS = 13; // unlocked once a run has reached tier 4
 const BEST_KEY = 'statespace.rush.best';
 
-type Booster = 'bomb' | 'freeze';
+type Booster = 'bomb' | 'freeze' | 'wall';
+type StartMode = 'full' | 'quick';
+type RushBoard = GlideLevel & { architect?: boolean };
 
 function tierOf(solved: number): number {
   return 1 + TIER_THRESHOLDS.filter((t) => solved >= t).length;
 }
 
+// At high tiers every 5th board is deliberately easy: grace, rhythm, and a
+// breath for the brain — thinking under a clock is taxing.
+function isBreather(n: number): boolean {
+  return n >= 13 && (n + 1) % 5 === 0;
+}
+
+// Roughly one board in seven (from tier 3 on) arrives UNSOLVABLE: the player
+// places a wall to make a solution exist, then solves their own board.
+const FORCE_ARCHITECT = new URLSearchParams(location.search).has('arch');
+function isArchitect(n: number): boolean {
+  if (FORCE_ARCHITECT) return true;
+  return n >= 7 && (n + 3) % 7 === 0 && !isBreather(n);
+}
+
 function difficulty(solved: number): GlideGenOptions {
+  if (isBreather(solved)) return { blockers: 2, minOptimal: 2, maxOptimal: 3, maxStates: 10_000 };
   if (solved < 3) return { blockers: 1, minOptimal: 1, maxOptimal: 2, maxStates: 10_000 };
   if (solved < 7) return { blockers: 2, minOptimal: 2, maxOptimal: 3, maxStates: 15_000 };
   if (solved < 13) return { blockers: 3, minOptimal: 3, maxOptimal: 4, maxStates: 25_000 };
@@ -95,6 +119,7 @@ export function createRushTab(): TabController {
             <p class="rush-best" data-best-line></p>
             <div class="btnrow center">
               <button class="btn primary big" data-start-btn>▶ &nbsp;START RUN</button>
+              <button class="btn big" data-quick-btn hidden>⚡ QUICK START · tier 3</button>
             </div>
           </div>
         </div>
@@ -103,9 +128,11 @@ export function createRushTab(): TabController {
           <div class="overlay-card rush-card">
             <div class="newbest" data-newbest hidden>🏆 NEW BEST</div>
             <h2 data-final-score>0</h2>
+            <p class="death-tease" data-tease hidden></p>
             <p data-death-stats></p>
             <div class="btnrow center">
               <button class="btn primary big" data-again>⚡ &nbsp;RUN AGAIN</button>
+              <button class="btn big" data-quick-again hidden>⚡ quick start</button>
               <button class="btn" data-zen>🧘 practice in Zen</button>
             </div>
             <p class="press-r">press <b>R</b> to run again</p>
@@ -133,6 +160,9 @@ export function createRushTab(): TabController {
   const boostersEl = root.querySelector<HTMLElement>('[data-boosters]')!;
   const pacerEl = root.querySelector<HTMLElement>('[data-pacer]')!;
   const targetNote = root.querySelector<HTMLElement>('[data-target-note]')!;
+  const teaseEl = root.querySelector<HTMLElement>('[data-tease]')!;
+  const quickBtn = root.querySelector<HTMLButtonElement>('[data-quick-btn]')!;
+  const quickAgainBtn = root.querySelector<HTMLButtonElement>('[data-quick-again]')!;
 
   let board: BoardView | null = null;
   let phase: 'idle' | 'running' | 'transition' | 'dead' = 'idle';
@@ -152,8 +182,9 @@ export function createRushTab(): TabController {
   let impactAt = 0;
 
   // board pipeline: generated in the background during play
-  let pending: GlideLevel[] = [];
+  let pending: RushBoard[] = [];
   let search: GlideLevelSearch | null = null;
+  let archSearch: ArchitectSearch | null = null;
   let searchFor = -1;
 
   // dead-end detection + great-move reward
@@ -170,12 +201,14 @@ export function createRushTab(): TabController {
     clock: 0,
   };
 
-  // boosters
+  // boosters + targeting ('architect' = the mandatory wall placement on broken boards)
   let boosters: Booster[] = [];
   let freezeLeft = 0;
-  let bombArmed = false;
+  let armed: null | 'bomb' | 'wall' | 'architect' = null;
   let lastTier = 1;
   let bestCache: Best = loadBest();
+  let fever = false;
+  let lastStartMode: StartMode = 'full';
 
   // stage-2 assist (warm/fatal shimmer on the previews)
   let assist: AssistEvaluator | null = null;
@@ -191,9 +224,11 @@ export function createRushTab(): TabController {
     boardsEl.textContent = `board ${solvedCount + 1}`;
     if (combo > 1) {
       comboEl.hidden = false;
-      comboEl.textContent = `×${combo}`;
+      comboEl.textContent = `×${combo}${fever ? ' 🔥' : ''}`;
+      comboEl.classList.toggle('fever', fever);
     } else {
       comboEl.hidden = true;
+      comboEl.classList.remove('fever');
     }
     // best-run pacer: racing your own ghost
     if (bestCache.boards > 0) {
@@ -211,42 +246,56 @@ export function createRushTab(): TabController {
     }
   }
 
+  const BOOSTER_META: Record<Booster, { icon: string; label: string }> = {
+    bomb: { icon: '💣', label: 'Bomb: destroy a blocker' },
+    freeze: { icon: '⏱', label: `Freeze: stop the clock ${FREEZE_SECONDS}s` },
+    wall: { icon: '🧱', label: 'Wall: build a stub anywhere' },
+  };
+
   function renderBoosters(): void {
     boostersEl.innerHTML = boosters
       .map(
         (b, i) =>
-          `<button class="booster-chip" data-use="${i}" title="${
-            b === 'bomb' ? 'Bomb: destroy a blocker' : `Freeze: stop the clock ${FREEZE_SECONDS}s`
-          } (key ${i + 1})">${b === 'bomb' ? '💣' : '⏱'}<span>${i + 1}</span></button>`,
+          `<button class="booster-chip" data-use="${i}" title="${BOOSTER_META[b].label} (key ${i + 1})">${BOOSTER_META[b].icon}<span>${i + 1}</span></button>`,
       )
       .join('');
   }
 
-  function cancelBombTargeting(): void {
-    if (!bombArmed) return;
-    bombArmed = false;
+  /** Drop bomb/wall targeting. Architect placement is mandatory — only force clears it. */
+  function cancelTargeting(force = false): void {
+    if (!armed) return;
+    if (armed === 'architect' && !force) return;
+    armed = null;
     targetNote.hidden = true;
     board?.setTargeting(false);
     if (board) board.domElement.style.cursor = 'default';
   }
 
+  function arm(kind: 'bomb' | 'wall' | 'architect', note: string): void {
+    cancelTargeting(true);
+    armed = kind;
+    targetNote.textContent = note;
+    targetNote.hidden = false;
+    board?.setTargeting(kind === 'bomb');
+    if (board) board.domElement.style.cursor = 'crosshair';
+  }
+
   function useBooster(i: number): void {
-    if (phase !== 'running' || i >= boosters.length) return;
+    if (phase !== 'running' || i >= boosters.length || armed === 'architect') return;
     const booster = boosters[i];
     if (booster === 'freeze') {
       boosters.splice(i, 1);
       renderBoosters();
-      cancelBombTargeting();
+      cancelTargeting();
       freezeLeft = FREEZE_SECONDS;
       sound.freeze();
       popup(`⏱ frozen ${FREEZE_SECONDS}s`, 'cyan');
+    } else if (booster === 'bomb') {
+      // consumed only when it actually detonates
+      arm('bomb', '💣 click a blocker to destroy it — Esc to cancel');
     } else {
-      // bomb: arm targeting; consumed only when it actually detonates
-      cancelBombTargeting();
-      bombArmed = true;
-      targetNote.hidden = false;
-      board?.setTargeting(true);
-      if (board) board.domElement.style.cursor = 'crosshair';
+      // consumed only when the wall is actually built
+      arm('wall', '🧱 click an empty cell to build a wall — Esc to cancel');
     }
   }
 
@@ -256,7 +305,7 @@ export function createRushTab(): TabController {
     if (slot === -1) return;
     boosters.splice(slot, 1);
     renderBoosters();
-    cancelBombTargeting();
+    cancelTargeting();
     current = current.filter((_, i) => i !== pieceIdx);
     selected = -1;
     hoverIdx = -1;
@@ -270,6 +319,63 @@ export function createRushTab(): TabController {
     startDistCheck();
   }
 
+  /** Is this cell free of walls and pieces (and on the board)? */
+  function cellIsEmpty(cell: number | null): cell is number {
+    if (cell === null || !level) return false;
+    if (level.spec.walls.includes(cell)) return false;
+    for (const p of current) {
+      if (gCells(level.spec, p).includes(cell)) return false;
+    }
+    return true;
+  }
+
+  function placeWallBooster(cell: number): void {
+    if (!board || !level) return;
+    const slot = boosters.indexOf('wall');
+    if (slot === -1) return;
+    boosters.splice(slot, 1);
+    renderBoosters();
+    cancelTargeting();
+    level.spec.walls.push(cell);
+    board.addWall(cell);
+    sound.thunk(0.6);
+    decoratedToken = '';
+    assist = null;
+    // double-edged like the bomb: walling off your own route gets caught here
+    prevDist = null;
+    startDistCheck();
+    refreshPreviews();
+  }
+
+  function placeArchitectWall(cell: number): void {
+    if (!board || !level) return;
+    // validate BEFORE committing: the placement must create a solution
+    const fixedSpec = { ...level.spec, walls: [...level.spec.walls, cell] };
+    const solver = new Solver(glideRules(fixedSpec), gCloneState(current), 'bfs');
+    solver.run(10_000);
+    if (solver.goalId === null) {
+      popup('still unsolvable — try another cell', 'muted');
+      sound.knock();
+      return; // stay armed, keep trying (the clock is the pressure)
+    }
+    const par = solver.nodes[solver.goalId].depth;
+    level.spec.walls.push(cell);
+    level.optimal = par;
+    board.addWall(cell);
+    sound.boosterEarn();
+    popup(`solvable — par ${par}!`, 'gold');
+    armed = null;
+    targetNote.hidden = true;
+    board.domElement.style.cursor = 'default';
+    movesThisBoard = 0;
+    prevDist = par;
+    lastMove = null;
+    lastMoveAt = performance.now();
+    decoratedToken = '';
+    assist = null;
+    refreshPreviews();
+  }
+
   function earnBooster(): void {
     if (boosters.length >= BOOSTER_CAP) {
       const consolation = 250 * combo;
@@ -277,11 +383,12 @@ export function createRushTab(): TabController {
       popup(`+${fmt(consolation)} (pockets full)`, 'gold small');
       return;
     }
-    const booster: Booster = Math.random() < 0.55 ? 'bomb' : 'freeze';
+    const r = Math.random();
+    const booster: Booster = r < 0.4 ? 'bomb' : r < 0.7 ? 'freeze' : 'wall';
     boosters.push(booster);
     renderBoosters();
     sound.boosterEarn();
-    popup(`${booster === 'bomb' ? '💣 BOMB' : '⏱ FREEZE'} earned!`, 'cyan');
+    popup(`${BOOSTER_META[booster].icon} ${booster.toUpperCase()} earned!`, 'cyan');
   }
 
   function popup(text: string, cls = ''): void {
@@ -297,11 +404,36 @@ export function createRushTab(): TabController {
   function pumpGeneration(): void {
     const needFor = solvedCount + 1 + pending.length;
     if (pending.length >= 2) return;
+
+    if (isArchitect(needFor - 1)) {
+      if (!archSearch || searchFor !== needFor) {
+        archSearch = new ArchitectSearch(
+          mulberry32((Date.now() ^ ((Math.random() * 0xffffff) | 0)) >>> 0),
+          { minPar: 3, maxPar: 7 },
+        );
+        search = null;
+        searchFor = needFor;
+      }
+      const found = archSearch.tick(1);
+      if (found) {
+        pending.push({
+          spec: found.spec,
+          state: found.state,
+          optimal: found.parAfter, // provisional — recomputed for the player's own fix
+          explored: 0,
+          architect: true,
+        });
+        archSearch = null;
+      }
+      return;
+    }
+
     if (!search || searchFor !== needFor) {
       search = new GlideLevelSearch(
         mulberry32((Date.now() ^ ((Math.random() * 0xffffff) | 0)) >>> 0),
         difficulty(needFor - 1),
       );
+      archSearch = null;
       searchFor = needFor;
     }
     const found = search.tick(2);
@@ -311,7 +443,7 @@ export function createRushTab(): TabController {
     }
   }
 
-  function loadBoard(lvl: GlideLevel, transition: boolean): void {
+  function loadBoard(lvl: RushBoard, transition: boolean): void {
     level = lvl;
     current = gCloneState(lvl.state);
     movesThisBoard = 0;
@@ -332,6 +464,11 @@ export function createRushTab(): TabController {
       board.setLayout(layout);
       board.setLevel(current);
     }
+    if (lvl.architect) {
+      // this board is broken on purpose: the player must build the missing wall
+      popup('🏗 ARCHITECT', 'big cyan');
+      arm('architect', '🏗 this board is unsolvable — click a cell to build the missing wall');
+    }
     updateHud();
   }
 
@@ -350,6 +487,8 @@ export function createRushTab(): TabController {
       popup(`TIER ${tier}`, 'big gold');
       sound.tierUp();
       window.setTimeout(() => board?.fanfareRing(), 250);
+    } else if (isBreather(solvedCount)) {
+      popup('breather ☕', 'muted');
     }
     window.setTimeout(() => {
       if (phase === 'transition') phase = 'running';
@@ -358,22 +497,36 @@ export function createRushTab(): TabController {
 
   // -- run lifecycle -----------------------------------------------------------
 
-  function startRun(): void {
+  function quickStartUnlocked(): boolean {
+    return bestCache.boards >= QUICK_UNLOCK_BOARDS;
+  }
+
+  function updateStartButtons(): void {
+    quickBtn.hidden = !quickStartUnlocked();
+    quickAgainBtn.hidden = !quickStartUnlocked();
+  }
+
+  function startRun(mode: StartMode = 'full'): void {
     stopAttract();
+    bestCache = loadBest();
+    if (mode === 'quick' && !quickStartUnlocked()) mode = 'full';
+    lastStartMode = mode;
     pending = [];
     search = null;
     searchFor = -1;
-    solvedCount = 0;
+    // quick start: skip the warmup you've outgrown — begin at tier 3
+    solvedCount = mode === 'quick' ? QUICK_START_BOARDS : 0;
+    lastTier = tierOf(solvedCount);
     score = 0;
     combo = 1;
     maxCombo = 1;
     boosters = [];
     freezeLeft = 0;
-    lastTier = 1;
-    bestCache = loadBest();
+    fever = false;
+    board?.setFever(false);
     assist = null;
     decoratedToken = '';
-    cancelBombTargeting();
+    cancelTargeting(true);
     renderBoosters();
     const bankParam = Number(new URLSearchParams(location.search).get('bank'));
     bank = Number.isFinite(bankParam) && bankParam > 0 ? bankParam : BANK_START;
@@ -382,11 +535,20 @@ export function createRushTab(): TabController {
     deathOverlay.hidden = true;
     hud.hidden = false;
 
-    // first board synchronously — warmup boards generate in milliseconds
-    const first = new GlideLevelSearch(
-      mulberry32((Date.now() ^ 0x9e3779b9) >>> 0),
-      difficulty(0),
-    ).runSync(10_000);
+    // first board synchronously (warmups mine in milliseconds, tier 3 in ~a second)
+    let first: RushBoard | null = null;
+    if (FORCE_ARCHITECT) {
+      const arch = new ArchitectSearch(mulberry32((Date.now() ^ 0x9e3779b9) >>> 0)).runSync(4000);
+      if (arch) {
+        first = { spec: arch.spec, state: arch.state, optimal: arch.parAfter, explored: 0, architect: true };
+      }
+    }
+    if (!first) {
+      first = new GlideLevelSearch(
+        mulberry32((Date.now() ^ 0x9e3779b9) >>> 0),
+        difficulty(solvedCount),
+      ).runSync(10_000);
+    }
     if (!first) return; // practically impossible; keeps types honest
     loadBoard(first, board !== null);
     phase = 'running';
@@ -396,17 +558,42 @@ export function createRushTab(): TabController {
   function die(): void {
     phase = 'dead';
     sound.gameOver();
-    cancelBombTargeting();
+    cancelTargeting(true);
+    fever = false;
+    board?.setFever(false);
     board?.clearPreviews();
     const best = loadBest();
     const isBest = score > best.score;
     if (isBest) {
       localStorage.setItem(BEST_KEY, JSON.stringify({ score, boards: solvedCount }));
+      bestCache = { score, boards: solvedCount };
     }
     newBestEl.hidden = !isBest;
     deathStatsEl.textContent =
       `${solvedCount} boards · tier ${tierOf(solvedCount)} · best combo ×${maxCombo}` +
       (isBest ? '' : ` · best ${fmt(best.score)}`);
+
+    // near-miss drama: the gap is the hook
+    teaseEl.hidden = true;
+    if (isBest && best.score > 0) {
+      teaseEl.textContent = `+${fmt(score - best.score)} over your old best`;
+      teaseEl.className = 'death-tease gold';
+      teaseEl.hidden = false;
+    } else if (!isBest && best.boards > 0) {
+      const boardsGap = best.boards - solvedCount;
+      const nextThr = TIER_THRESHOLDS.find((t) => t > solvedCount);
+      if (boardsGap > 0 && boardsGap <= 2) {
+        teaseEl.textContent = `${boardsGap} board${boardsGap > 1 ? 's' : ''} short of your best — run again!`;
+        teaseEl.className = 'death-tease hot';
+        teaseEl.hidden = false;
+      } else if (nextThr && nextThr - solvedCount <= 2) {
+        const gap = nextThr - solvedCount;
+        teaseEl.textContent = `tier ${tierOf(nextThr)} was ${gap} board${gap > 1 ? 's' : ''} away`;
+        teaseEl.className = 'death-tease amber';
+        teaseEl.hidden = false;
+      }
+    }
+    updateStartButtons();
     deathOverlay.hidden = false;
     // score count-up
     const target = score;
@@ -420,13 +607,27 @@ export function createRushTab(): TabController {
     requestAnimationFrame(count);
   }
 
+  function breakStreak(): void {
+    combo = 1;
+    sound.comboBreak();
+    if (fever) {
+      fever = false;
+      board?.setFever(false);
+      vignette.classList.remove('fever');
+      popup('fever lost', 'muted');
+    } else {
+      popup('combo lost', 'muted');
+    }
+  }
+
   function onSolved(dur: number): void {
     if (!level) return;
     phase = 'transition';
     distSolver = null;
-    cancelBombTargeting();
+    cancelTargeting(true);
     board?.clearPreviews();
     const par = level.optimal;
+    const wasArchitect = (level as RushBoard).architect === true;
     const atPar = movesThisBoard <= par;
     const isClutch = bank < CLUTCH_WINDOW;
 
@@ -440,15 +641,26 @@ export function createRushTab(): TabController {
       if (combo >= 3 && combo % 2 === 1) {
         window.setTimeout(() => earnBooster(), dur * 1000 + 420);
       }
+      // FEVER: the streak's summit — gold regime, hotter board, 1.5x points
+      if (!fever && combo >= FEVER_COMBO) {
+        fever = true;
+        board?.setFever(true);
+        popup('FEVER!', 'big gold');
+        window.setTimeout(() => sound.feverUp(), dur * 1000 + 320);
+      }
     } else if (combo > 1) {
-      combo = 1;
-      sound.comboBreak();
-      popup('combo lost', 'muted');
+      breakStreak();
     }
 
-    const grant = 3 + 1.5 * par;
+    const grant = 3 + 1.5 * par + (wasArchitect ? 3 : 0);
     bank = Math.min(BANK_CAP, bank + grant);
-    let points = Math.round((100 * par + 15 * Math.max(0, Math.floor(bank))) * combo);
+    let points = Math.round(
+      (100 * par + 15 * Math.max(0, Math.floor(bank))) * combo * (fever ? FEVER_MULT : 1),
+    );
+    if (wasArchitect) {
+      points += ARCHITECT_BONUS;
+      popup(`architect +${ARCHITECT_BONUS}`, 'cyan small');
+    }
     if (isClutch) {
       const bonus = 250 * combo;
       points += bonus;
@@ -457,7 +669,7 @@ export function createRushTab(): TabController {
     }
     score += points;
     solvedCount++;
-    popup(`+${fmt(points)}${combo > 1 ? ` ×${combo}` : ''}`, 'gold');
+    popup(`+${fmt(points)}${combo > 1 ? ` ×${combo}` : ''}${fever ? ' 🔥' : ''}`, 'gold');
     popup(`+${grant.toFixed(0)}s`, 'green small');
     updateHud();
 
@@ -468,7 +680,7 @@ export function createRushTab(): TabController {
     if (phase !== 'running') return;
     phase = 'transition';
     distSolver = null;
-    cancelBombTargeting();
+    cancelTargeting(true);
     board?.clearPreviews();
     if (reason === 'manual') {
       bank = Math.max(0.5, bank - 5);
@@ -476,10 +688,7 @@ export function createRushTab(): TabController {
     } else {
       popup('dead end — next board', 'muted');
     }
-    if (combo > 1) {
-      combo = 1;
-      sound.comboBreak();
-    }
+    if (combo > 1) breakStreak();
     updateHud();
     window.setTimeout(() => nextBoard(), 250);
   }
@@ -561,14 +770,25 @@ export function createRushTab(): TabController {
       (e) => {
         if (e.button !== 0) return; // right/middle button is reserved for the camera
         if (phase !== 'running') return;
-        if (bombArmed) {
+        if (armed === 'bomb') {
           const target = bv.pickAt(e.clientX, e.clientY);
           if (target !== null && target > 0) {
             detonate(target);
           } else {
-            cancelBombTargeting();
+            cancelTargeting();
             sound.knock();
           }
+          return;
+        }
+        if (armed === 'wall' || armed === 'architect') {
+          const cell = bv.pickCellAt(e.clientX, e.clientY);
+          if (!cellIsEmpty(cell)) {
+            sound.knock();
+            if (armed === 'wall') cancelTargeting();
+            return;
+          }
+          if (armed === 'wall') placeWallBooster(cell);
+          else placeArchitectWall(cell);
           return;
         }
         const preview = bv.pickPreviewAt(e.clientX, e.clientY);
@@ -622,6 +842,10 @@ export function createRushTab(): TabController {
         return;
       }
       if (phase !== 'running') return;
+      if (armed) {
+        canvas.style.cursor = 'crosshair';
+        return;
+      }
       if (bv.pickPreviewAt(e.clientX, e.clientY)) {
         canvas.style.cursor = 'pointer';
         return;
@@ -646,6 +870,10 @@ export function createRushTab(): TabController {
 
   function tryGlide(pieceIdx: number, dr: number, dc: number): void {
     if (!level || !board || phase !== 'running') return;
+    if (armed === 'architect') {
+      sound.knock();
+      return; // the wall must be built first
+    }
     const slid = glideMove(level.spec, current, pieceIdx, dr, dc);
     if (!slid) {
       board.pulseInvalid(pieceIdx, dr, dc);
@@ -656,7 +884,7 @@ export function createRushTab(): TabController {
     movesThisBoard++;
     lastMoveAt = performance.now();
     lastMove = { pieceIdx, dist: slid.dist };
-    cancelBombTargeting();
+    cancelTargeting();
     assist = null;
     const dur = board.applyState(current);
     sound.whoosh(slid.dist);
@@ -674,12 +902,12 @@ export function createRushTab(): TabController {
   function onKey(e: KeyboardEvent): void {
     if (phase === 'idle' && (e.key === 'Enter' || e.key === ' ')) {
       e.preventDefault();
-      startRun();
+      startRun(lastStartMode);
       return;
     }
     if (phase === 'dead' && (e.key === 'Enter' || e.key === ' ' || e.key === 'r' || e.key === 'R')) {
       e.preventDefault();
-      startRun();
+      startRun(lastStartMode);
       return;
     }
     if (e.key === '1' || e.key === '2' || e.key === '3') {
@@ -696,8 +924,9 @@ export function createRushTab(): TabController {
       e.preventDefault();
       if (selected >= 0) tryGlide(selected, dirs[e.key][0], dirs[e.key][1]);
     } else if (e.key === 'Escape') {
-      if (bombArmed) {
-        cancelBombTargeting();
+      if (armed) {
+        if (armed === 'architect') sound.knock(); // can't back out — build the wall
+        else cancelTargeting();
         return;
       }
       selected = -1;
@@ -845,8 +1074,14 @@ export function createRushTab(): TabController {
     timeFill.className = `time-fill ${
       freezeLeft > 0 ? 'frozen' : bank < 5 ? 'danger' : bank < 12 ? 'warn' : ''
     }`;
-    vignette.style.opacity =
-      phase === 'running' && freezeLeft <= 0 && bank < 5 ? String(((5 - bank) / 5) * 0.55) : '0';
+    // vignette: red danger takes priority; otherwise fever bathes the edges gold
+    const danger = phase === 'running' && freezeLeft <= 0 && bank < 5;
+    vignette.classList.toggle('fever', fever && !danger);
+    vignette.style.opacity = danger
+      ? String(((5 - bank) / 5) * 0.55)
+      : fever && phase === 'running'
+        ? '0.4'
+        : '0';
 
     if (distSolver) {
       let n = 4000;
@@ -866,8 +1101,10 @@ export function createRushTab(): TabController {
     board?.frame(dt);
   }
 
-  root.querySelector('[data-start-btn]')!.addEventListener('click', startRun);
-  root.querySelector('[data-again]')!.addEventListener('click', startRun);
+  root.querySelector('[data-start-btn]')!.addEventListener('click', () => startRun('full'));
+  root.querySelector('[data-again]')!.addEventListener('click', () => startRun(lastStartMode));
+  quickBtn.addEventListener('click', () => startRun('quick'));
+  quickAgainBtn.addEventListener('click', () => startRun('quick'));
   root.querySelector('[data-skip]')!.addEventListener('click', () => skipBoard('manual'));
   boostersEl.addEventListener('click', (e) => {
     const chip = (e.target as HTMLElement).closest<HTMLElement>('[data-use]');
@@ -896,6 +1133,7 @@ export function createRushTab(): TabController {
         const best = loadBest();
         bestLine.textContent =
           best.score > 0 ? `your best: ${fmt(best.score)} (${best.boards} boards)` : '';
+        updateStartButtons();
       }
       window.addEventListener('keydown', onKey);
       if (phase === 'idle') startAttract();

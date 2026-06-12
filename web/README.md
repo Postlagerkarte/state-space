@@ -16,8 +16,12 @@ npm run mine     # offline level mining (generate-and-test + BFS validation)
 - **⚡ Rush** (default) — an endless arcade run on generated "glide" boards
   (pieces slide until they hit something; park the gold block exactly on the
   pad). A global time bank drains; solves refund time; at-par streaks build a
-  combo multiplier that earns boosters (bomb, freeze). The generator + BFS
-  solver mine difficulty-calibrated boards live during play.
+  combo multiplier that earns boosters (bomb, freeze, wall) and ignites
+  FEVER (×1.5 points) at ×5. The generator + BFS solver mine
+  difficulty-calibrated boards live during play — including occasional
+  ARCHITECT boards that arrive unsolvable until you build the missing wall,
+  and breather boards that give your brain a beat. Reach tier 4 once and
+  QUICK START unlocks (skip the warmup, begin at tier 3).
 - **🧘 Zen** — the curated campaign with stars, undo and hints. Landing
   previews (ghosts of every spot a piece can glide to) appear after a moment
   of inactivity; stuck longer, and the solver shimmers the optimal landings.
