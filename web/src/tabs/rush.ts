@@ -84,7 +84,7 @@ export function createRushTab(): TabController {
         <div class="vignette" data-vignette></div>
         <div class="popups" data-popups></div>
 
-        <div class="overlay" data-start>
+        <div class="overlay overlay-attract" data-start>
           <div class="overlay-card rush-card">
             <h2>⚡ Rush</h2>
             <p>Endless boards, one draining clock.<br/>
@@ -160,6 +160,15 @@ export function createRushTab(): TabController {
   let distSolver: Solver<GState, GMove> | null = null;
   let prevDist: number | null = null;
   let lastMove: { pieceIdx: number; dist: number } | null = null;
+
+  // attract mode: the AI auto-plays boards behind the start screen
+  const attract = {
+    active: false,
+    sub: 'gen' as 'gen' | 'play' | 'done',
+    solution: null as GState[] | null,
+    step: 0,
+    clock: 0,
+  };
 
   // boosters
   let boosters: Booster[] = [];
@@ -350,6 +359,7 @@ export function createRushTab(): TabController {
   // -- run lifecycle -----------------------------------------------------------
 
   function startRun(): void {
+    stopAttract();
     pending = [];
     search = null;
     searchFor = -1;
@@ -696,10 +706,93 @@ export function createRushTab(): TabController {
     }
   }
 
+  // -- attract mode ---------------------------------------------------------------
+  // Before the first START, the solver auto-plays a stream of boards behind the
+  // dialog: glide, solve, fireworks, next. It's the game demonstrating itself.
+
+  function startAttract(): void {
+    if (phase !== 'idle') return;
+    attract.active = true;
+    attract.sub = 'gen';
+    attract.solution = null;
+    attract.step = 0;
+    attract.clock = 0;
+    board?.setAutoRotate(true);
+  }
+
+  function stopAttract(): void {
+    attract.active = false;
+    attract.solution = null;
+    board?.setAutoRotate(false);
+  }
+
+  function attractTick(dt: number): void {
+    const STEP = 0.62;
+    const DONE_WAIT = 2.2;
+
+    if (attract.sub === 'gen') {
+      const lvl = new GlideLevelSearch(
+        mulberry32((Date.now() ^ ((Math.random() * 0xffffff) | 0)) >>> 0),
+        { blockers: 3, minOptimal: 4, maxOptimal: 6, maxStates: 20_000 },
+      ).runSync(4000);
+      if (!lvl) return; // unlucky batch — try again next frame
+      const solver = new Solver(glideRules(lvl.spec), gCloneState(lvl.state), 'bfs');
+      solver.run(50_000);
+      const path = solver.path();
+      if (!path) return;
+      attract.solution = path.map((n) => n.state);
+      attract.step = 0;
+      attract.clock = 0;
+      const layout = glideLayout(lvl.spec);
+      if (!board) {
+        board = new BoardView(boardHost, layout, { interactive: true });
+        attachPointer(board);
+        board.setLevel(gCloneState(lvl.state));
+      } else {
+        board.transitionTo(gCloneState(lvl.state), layout);
+      }
+      board.setAutoRotate(true);
+      attract.sub = 'play';
+      return;
+    }
+
+    if (attract.sub === 'play') {
+      if (!attract.solution || !board) {
+        attract.sub = 'gen';
+        return;
+      }
+      attract.clock += dt;
+      if (attract.clock >= STEP) {
+        attract.clock = 0;
+        attract.step++;
+        if (attract.step < attract.solution.length) {
+          board.applyState(attract.solution[attract.step]);
+          if (attract.step === attract.solution.length - 1) {
+            board.celebrate('quick');
+            attract.sub = 'done';
+          }
+        } else {
+          attract.sub = 'done';
+        }
+      }
+      return;
+    }
+
+    // 'done': linger on the win, then roll the next board
+    attract.clock += dt;
+    if (attract.clock >= DONE_WAIT) {
+      attract.sub = 'gen';
+      attract.solution = null;
+      attract.clock = 0;
+    }
+  }
+
   // -- main loop ------------------------------------------------------------------
 
   function tick(dt: number): void {
     pumpGeneration();
+
+    if (phase === 'idle' && attract.active) attractTick(dt);
 
     // waiting on the generator? resume as soon as a board lands
     if (phase === 'transition' && !miningEl.hidden && pending.length > 0) {
@@ -805,6 +898,7 @@ export function createRushTab(): TabController {
           best.score > 0 ? `your best: ${fmt(best.score)} (${best.boards} boards)` : '';
       }
       window.addEventListener('keydown', onKey);
+      if (phase === 'idle') startAttract();
       last = performance.now();
       raf = requestAnimationFrame(loop);
     },

@@ -875,6 +875,14 @@ export class BoardView {
     if (this.controls) this.controls.enabled = enabled;
   }
 
+  /** Slow auto-spin for the attract screen. */
+  setAutoRotate(on: boolean): void {
+    if (this.controls) {
+      this.controls.autoRotate = on;
+      this.controls.autoRotateSpeed = 0.8;
+    }
+  }
+
   frame(dt: number): void {
     this.time += dt;
 

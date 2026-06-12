@@ -378,6 +378,17 @@ input[type='range'] {
   z-index: 5;
 }
 
+/* Start screen: no blur and only a light veil, so the attract-mode board and
+   its fireworks stay visible playing behind the dialog. */
+.overlay-attract {
+  background: radial-gradient(
+    ellipse at center,
+    rgba(8, 10, 18, 0.5) 0%,
+    rgba(8, 10, 18, 0.16) 100%
+  );
+  backdrop-filter: none;
+}
+
 .overlay-card {
   background: rgba(20, 24, 38, 0.95);
   border: 1px solid rgba(255, 183, 3, 0.35);
