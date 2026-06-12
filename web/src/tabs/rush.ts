@@ -90,6 +90,8 @@ export function createRushTab(): TabController {
             <p>Endless boards, one draining clock.<br/>
             Solving refunds time — harder boards refund more.<br/>
             Stay at par to build your combo — milestones earn boosters.</p>
+            <p class="controls-hint">drag a piece to move · <b>right-drag</b> to rotate ·
+            <b>1 2 3</b> use boosters</p>
             <p class="rush-best" data-best-line></p>
             <div class="btnrow center">
               <button class="btn primary big" data-start-btn>▶ &nbsp;START RUN</button>
@@ -547,6 +549,7 @@ export function createRushTab(): TabController {
     canvas.addEventListener(
       'pointerdown',
       (e) => {
+        if (e.button !== 0) return; // right/middle button is reserved for the camera
         if (phase !== 'running') return;
         if (bombArmed) {
           const target = bv.pickAt(e.clientX, e.clientY);

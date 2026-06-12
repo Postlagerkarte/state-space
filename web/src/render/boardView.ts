@@ -165,6 +165,11 @@ export class BoardView {
       this.controls.maxDistance = fit * 2.2;
       this.controls.maxPolarAngle = Math.PI * 0.42;
       this.controls.target.set(0, 0, 0.2);
+      // Rotate the board with the RIGHT button only; the left button is reserved
+      // entirely for moving pieces, so the camera never spins by accident.
+      this.controls.mouseButtons = { MIDDLE: THREE.MOUSE.DOLLY, RIGHT: THREE.MOUSE.ROTATE };
+      // On touch: two fingers orbit/zoom, one finger is free to drag pieces.
+      this.controls.touches = { TWO: THREE.TOUCH.DOLLY_ROTATE };
     }
 
     this.buildStaticBoard();

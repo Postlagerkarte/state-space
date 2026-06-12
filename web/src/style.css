@@ -881,6 +881,20 @@ input[type='range'] {
   color: var(--muted);
 }
 
+.controls-hint {
+  margin-top: 10px;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.controls-hint b {
+  color: var(--text);
+}
+
+.dim {
+  opacity: 0.7;
+}
+
 .press-r b {
   color: var(--text);
 }

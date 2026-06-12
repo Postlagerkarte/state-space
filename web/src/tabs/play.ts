@@ -57,7 +57,8 @@ export function createPlayTab(): TabController {
           <p class="hint"><b>Drag a piece</b> — it glides until it hits something.
           Stuck? Pause for a moment and hover a piece: ghosts show every spot it
           can glide to (click one to move). A <b class="gold">pulsing gold ghost</b>
-          means you're one move from winning.</p>
+          means you're one move from winning.
+          <br/><span class="dim">Right-drag to spin the board · scroll to zoom.</span></p>
         </div>
         <div class="panel note">
           Par is computed live by breadth-first search — every level you play is a
@@ -196,6 +197,7 @@ export function createPlayTab(): TabController {
     canvas.addEventListener(
       'pointerdown',
       (e) => {
+        if (e.button !== 0) return; // right/middle button is reserved for the camera
         // clicking a landing ghost executes that move directly
         const preview = bv.pickPreviewAt(e.clientX, e.clientY);
         if (preview) {
