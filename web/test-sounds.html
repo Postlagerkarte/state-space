@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Sound Testing Lab</title>
+    <style>
+        body {
+            background: #11151f;
+            color: #fff;
+            font-family: sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            margin: 0;
+        }
+        #soundBoard {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+            gap: 12px;
+            width: 90%;
+            max-width: 800px;
+        }
+        .sound-btn {
+            padding: 15px;
+            font-size: 1rem;
+            font-weight: bold;
+            background: #333a4d;
+            color: #ffd166;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: transform 0.1s, background 0.2s;
+        }
+        .sound-btn:hover {
+            background: #444c63;
+        }
+        .sound-btn:active {
+            transform: scale(0.95);
+            background: #ffd166;
+            color: #11151f;
+        }
+        p { opacity: 0.6; margin-top: 20px; font-size: 0.9rem; }
+        #status { color: #4d7cfe; font-weight: bold; }
+    </style>
+</head>
+<body>
+    <h1>Sound Testing Lab</h1>
+    <div id="soundBoard"></div>
+    <p>Testing: <code>src/game/sound.ts</code></p>
+    <p>Status: <span id="status">Waiting for dev server...</span></p>
+
+    <script type="module">
+        import * as sounds from './src/game/sound.ts';
+        const container = document.getElementById('soundBoard');
+        
+        // Filter out utility functions, keep only sound triggers
+        const soundNames = Object.keys(sounds).filter(name => 
+            typeof sounds[name] === 'function' && 
+            !['isMuted', 'toggleMute'].includes(name)
+        );
+
+soundNames.forEach(name => {
+        const btn = document.createElement('button');
+        btn.className = 'sound-btn';
+        btn.textContent = name;
+
+        btn.addEventListener('click', () => {
+            console.log(`Playing: ${name}`);
+
+            try {
+                sounds[name]();
+            } catch (err) {
+                console.error(`Failed to play ${name}:`, err);
+            }
+        });
+            container.appendChild(btn);
+        });
+
+        document.getElementById('status').innerText = `Loaded ${soundNames.length} sounds ✅`;
+    </script>
+</body>
+</html>
