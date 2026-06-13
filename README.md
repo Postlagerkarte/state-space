@@ -4,7 +4,11 @@
 
 ### A sliding-block puzzle that sat on a hard drive for **twelve years** — reborn as a tiny, addictive game that secretly teaches you *how computers think.*
 
-**[▶ Play it now](https://postlagerkarte.github.io/puzzle/)** — no install, runs in your browser.
+**[▶ Play it now](https://postlagerkarte.github.io/state-space/)** — no install, runs in your browser.
+
+<br>
+
+<img src="web/screenshots/rush.png" alt="Rush mode: a 3D sliding-block puzzle board" width="560">
 
 </div>
 
@@ -36,6 +40,14 @@ It is, at the end of the day, still just a weekend project with plenty of rough 
 | 🏁 **Race** | BFS vs DFS vs A*, side by side. | Watch A\* smugly find in ~3,000 steps what plain BFS slogs through ~26,000 to reach. |
 
 You came for a puzzle. You'll leave knowing what A\* is.
+
+<div align="center">
+
+<img src="web/screenshots/race.png" alt="Race mode: BFS, DFS and A* exploring the same puzzle side by side" width="820">
+
+<sub><b>Race mode</b> — the same puzzle, three algorithms: BFS explores everything, DFS wanders off in threads, A\* beelines for the goal.</sub>
+
+</div>
 
 ---
 
