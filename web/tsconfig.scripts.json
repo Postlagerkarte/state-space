@@ -1,0 +1,10 @@
+{
+  // Dev/smoke scripts run under Node (tsx), so they get Node globals (process)
+  // and lib types. Kept separate from the app tsconfig so browser code in src/
+  // never accidentally type-checks against Node APIs it can't use at runtime.
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "types": ["node"]
+  },
+  "include": ["scripts"]
+}
